@@ -1,7 +1,7 @@
 {
-  "name": "vazorism",
+  "name": "vertex",
   "private": true,
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Personal Game & Application Tracker",
   "type": "module",
   "scripts": {
