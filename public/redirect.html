@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Redirecting...</title>
+    <style>
+      body {
+        background-color: #0A0612;
+        color: white;
+        font-family: sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+      }
+      .spinner {
+        border: 4px solid rgba(255, 255, 255, 0.1);
+        border-top: 4px solid #a855f7;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        animation: spin 1s linear infinite;
+        margin-bottom: 16px;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="spinner"></div>
+      <p>Redirecting to login provider...</p>
+      <a id="fallback-link" href="#" style="color: #c084fc; font-size: 14px; margin-top: 16px; display: none;">Click here if not redirected</a>
+    </div>
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const targetUrl = params.get('url');
+      if (targetUrl) {
+        document.getElementById('fallback-link').href = targetUrl;
+        document.getElementById('fallback-link').style.display = 'block';
+        window.location.href = targetUrl;
+      } else {
+        document.body.innerHTML = 'Missing URL parameter';
+      }
+    </script>
+  </body>
+</html>

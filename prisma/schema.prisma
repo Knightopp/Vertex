@@ -1,0 +1,316 @@
+// This is your Prisma schema file
+// Learn more at https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ─────────────────────────────────────────────
+// Core: Library Entry
+// ─────────────────────────────────────────────
+
+model LibraryEntry {
+  id               String    @id @default(uuid())
+  provider         String    @default("local") // "steam", "local", "epic", etc.
+  providerGameId   String    // ID from the provider (e.g., "730", or a generated hash for local)
+  title            String
+  type             String    @default("game") // "game" | "application"
+  status           String    @default("unplayed") // "playing" | "completed" | "backlog" | "dropped" | "wishlist" | "unplayed"
+  executablePath   String?
+  installDirectory String?
+  executableName   String?
+  rating           Float?
+  favorite         Boolean   @default(false)
+  hidden           Boolean   @default(false)
+  playtimeTotal    Int       @default(0) // Total effective seconds
+  lastPlayedAt     DateTime?
+  addedAt          DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  metadata    Metadata?
+  sessions    Session[]
+  images      Image[]
+  review      Review?
+  notes       Note[]
+  tags        EntryTag[]
+  genres      EntryGenre[]
+  collections CollectionEntry[]
+
+  @@unique([provider, providerGameId])
+  @@index([title])
+  @@index([type])
+  @@index([status])
+  @@index([lastPlayedAt])
+  @@index([playtimeTotal])
+  @@index([executableName])
+  @@index([updatedAt])
+  @@map("library_entries")
+}
+
+// ─────────────────────────────────────────────
+// Metadata (extended, from API providers)
+// ─────────────────────────────────────────────
+
+model Metadata {
+  id              String    @id @default(uuid())
+  entryId         String    @unique
+  description     String?
+  developer       String?
+  publisher       String?
+  releaseDate     DateTime?
+  platforms       String? // JSON array: ["PC", "PS5", "Xbox"]
+  igdbId          Int?
+  rawgId          Int?
+  steamAppId      Int?
+  igdbRating      Float?
+  rawgRating      Float?
+  metacriticScore Int?
+  source          String? // Which provider supplied this data
+  fetchedAt       DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  entry LibraryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([igdbId])
+  @@index([rawgId])
+  @@index([steamAppId])
+  @@map("metadata")
+}
+
+// ─────────────────────────────────────────────
+// Sessions (playtime tracking)
+// ─────────────────────────────────────────────
+
+model Session {
+  id               String    @id @default(uuid())
+  entryId          String
+  startedAt        DateTime
+  endedAt          DateTime?
+  durationSeconds  Int       @default(0) // Total wall clock seconds
+  effectiveSeconds Int       @default(0) // Playtime minus idle
+  idleSeconds      Int       @default(0) // Time spent idle
+  isActive         Boolean   @default(true)
+  processId        Int?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  entry LibraryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([entryId])
+  @@index([startedAt])
+  @@index([isActive])
+  @@map("sessions")
+}
+
+// ─────────────────────────────────────────────
+// Images (cached cover art, heroes, screenshots)
+// ─────────────────────────────────────────────
+
+model Image {
+  id        String   @id @default(uuid())
+  entryId   String
+  type      String // "cover" | "hero" | "logo" | "screenshot" | "icon"
+  localPath String
+  remoteUrl String?
+  width     Int?
+  height    Int?
+  sizeBytes Int?
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entry LibraryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([entryId])
+  @@index([type])
+  @@unique([entryId, type, isPrimary])
+  @@map("images")
+}
+
+// ─────────────────────────────────────────────
+// Reviews (one per entry)
+// ─────────────────────────────────────────────
+
+model Review {
+  id           String    @id @default(uuid())
+  entryId      String    @unique
+  content      String // Review text (markdown)
+  rating       Float?
+  startedDate  DateTime?
+  finishedDate DateTime?
+  playedOn     String? // Platform played on
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  entry LibraryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}
+
+// ─────────────────────────────────────────────
+// Notes (multiple per entry)
+// ─────────────────────────────────────────────
+
+model Note {
+  id        String   @id @default(uuid())
+  entryId   String
+  content   String
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entry LibraryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([entryId])
+  @@map("notes")
+}
+
+// ─────────────────────────────────────────────
+// Tags (many-to-many with entries)
+// ─────────────────────────────────────────────
+
+model Tag {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String? // Hex color for UI badge
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entries EntryTag[]
+
+  @@map("tags")
+}
+
+model EntryTag {
+  entryId   String
+  tagId     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entry LibraryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  tag   Tag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([entryId, tagId])
+  @@map("entry_tags")
+}
+
+// ─────────────────────────────────────────────
+// Genres (many-to-many with entries)
+// ─────────────────────────────────────────────
+
+model Genre {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entries EntryGenre[]
+
+  @@map("genres")
+}
+
+model EntryGenre {
+  entryId String
+  genreId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entry LibraryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  genre Genre        @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([entryId, genreId])
+  @@map("entry_genres")
+}
+
+// ─────────────────────────────────────────────
+// Collections (user-created groupings)
+// ─────────────────────────────────────────────
+
+model Collection {
+  id             String   @id @default(uuid())
+  name           String
+  description    String?
+  coverImagePath String?
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  entries CollectionEntry[]
+
+  @@index([updatedAt])
+  @@map("collections")
+}
+
+model CollectionEntry {
+  collectionId String
+  entryId      String
+  sortOrder    Int      @default(0)
+  addedAt      DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  collection Collection   @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  entry      LibraryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, entryId])
+  @@index([updatedAt])
+  @@map("collection_entries")
+}
+
+// ─────────────────────────────────────────────
+// Settings (key-value store)
+// ─────────────────────────────────────────────
+
+model Setting {
+  key       String   @id
+  value     String // JSON serialized
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+  @@map("settings")
+}
+
+// ─────────────────────────────────────────────
+// Discovery Cache (trending, new releases, etc.)
+// ─────────────────────────────────────────────
+
+model DiscoveryCache {
+  id        String   @id @default(uuid())
+  category  String   @unique // "trending" | "new_releases" | "upcoming" | "top_rated" | "deals"
+  data      String // JSON serialized response
+  fetchedAt DateTime @default(now())
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([expiresAt])
+  @@map("discovery_cache")
+}
+
+// ─────────────────────────────────────────────
+// Cloud Sync Queue (Offline-First)
+// ─────────────────────────────────────────────
+
+model SyncQueue {
+  id            String   @id @default(uuid())
+  operationId   String   @unique
+  entityType    String   // "library_game", "collection", "portable_setting"
+  operationType String   // "upsert", "delete"
+  payload       String   // JSON string of the mutation
+  retryCount    Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([createdAt])
+  @@map("sync_queue")
+}

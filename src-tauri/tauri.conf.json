@@ -1,0 +1,70 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Vertex",
+  "version": "1.2.0",
+  "identifier": "com.vazorism.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:8080",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Vertex",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": true,
+        "transparent": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: https://corsproxy.io https://images.unsplash.com https://upload.wikimedia.org https://cdn.discordapp.com https://*.googleusercontent.com https://*.igdb.com https://*.rawg.io https://*.steamstatic.com https://*.akamaihd.net https://*.allorigins.win https://*.steamgriddb.com https://ui-avatars.com data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://corsproxy.io https://*.igdb.com https://*.rawg.io https://store.steampowered.com https://*.cheapshark.com https://*.allorigins.win https://www.pcgamingwiki.com https://id.twitch.tv https://clients3.google.com https://*.steamgriddb.com https://ui-avatars.com https://fpzbupubmmryjjnyfear.supabase.co"
+    },
+    "trayIcon": {
+      "iconPath": "icons/icon.ico",
+      "iconAsTemplate": false,
+      "tooltip": "Vertex"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["vazorism"]
+      },
+      "mobile": [
+        {
+          "scheme": ["vazorism"]
+        }
+      ]
+    },
+    "updater": {
+      "endpoints": [
+        "https://github.com/YOUR_USERNAME/YOUR_REPO_NAME/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE3RkEzRTU5QjMzQTA4N0UKUldSK0NEcXpXVDc2RjQ1UDV3cjVUWlRBdmtxZ3FtdWZNQ3ZlaUEwVHVBS2hnNGJYa2hNcjVHaHEK"
+    }
+  }
+}
