@@ -62,7 +62,7 @@
     },
     "updater": {
       "endpoints": [
-        "https://github.com/YOUR_USERNAME/YOUR_REPO_NAME/releases/latest/download/latest.json"
+        "https://github.com/Knightopp/Vertex/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE3RkEzRTU5QjMzQTA4N0UKUldSK0NEcXpXVDc2RjQ1UDV3cjVUWlRBdmtxZ3FtdWZNQ3ZlaUEwVHVBS2hnNGJYa2hNcjVHaHEK"
     }

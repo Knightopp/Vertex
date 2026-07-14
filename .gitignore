@@ -30,3 +30,5 @@ prisma/*.db-journal
 
 vertex.key
 vertex.key.pub
+
+src-tauri/gen/android/app/keystore.jks
