@@ -1,6 +1,6 @@
 [package]
 name = "vazorism"
-version = "0.1.0"
+version = "1.2.1"
 description = "Personal Game & Application Tracker"
 authors = ["Vazorism"]
 license = "MIT"
