@@ -1,7 +1,7 @@
 {
   "name": "vertex",
   "private": true,
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "Personal Game & Application Tracker",
   "type": "module",
   "scripts": {

@@ -33,6 +33,13 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Check secrets
+        run: |
+          if ("${{ secrets.TAURI_PRIVATE_KEY }}" -eq "") {
+            Write-Error "TAURI_PRIVATE_KEY secret is not set in GitHub repository secrets!"
+            exit 1
+          }
+
       - name: Build and Publish Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
