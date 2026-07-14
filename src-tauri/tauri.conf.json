@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Vertex",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "identifier": "com.vazorism.app",
   "build": {
     "frontendDist": "../dist",
@@ -36,6 +36,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["nsis", "msi"],
     "icon": [
       "icons/32x32.png",
