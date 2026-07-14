@@ -1,7 +1,7 @@
 {
   "name": "vazorism",
   "private": true,
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Personal Game & Application Tracker",
   "type": "module",
   "scripts": {

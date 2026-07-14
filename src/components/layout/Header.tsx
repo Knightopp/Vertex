@@ -5,6 +5,7 @@ import { Bell } from "lucide-react";
 import { useState, useEffect } from "react";
 import { libraryManager } from "@/services/LibraryManager";
 import { toast } from "sonner";
+import { useAppStore } from "@/stores/app-store";
 
 import { GlobalSearch } from "./GlobalSearch";
 
@@ -16,6 +17,7 @@ const navLinks = [
 
 export default function Header() {
   const { user, profile, signOut } = useAuthStore();
+  const { updateAvailable, installUpdate, dismissUpdate } = useAppStore();
   const [showLegacyNotification, setShowLegacyNotification] = useState(false);
 
   useEffect(() => {
@@ -90,7 +92,7 @@ export default function Header() {
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 transition-transform hover:scale-110 hover:bg-white/10 text-white/70 hover:text-white relative"
           >
             <Bell className="w-5 h-5" />
-            {showLegacyNotification && (
+            {(showLegacyNotification || updateAvailable) && (
               <span className="absolute top-2 right-2.5 w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
             )}
           </button>
@@ -102,7 +104,33 @@ export default function Header() {
               </div>
               
               <div className="flex flex-col max-h-[300px] overflow-y-auto custom-scrollbar">
-                {showLegacyNotification ? (
+                {updateAvailable && (
+                  <div className="p-4 border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-[10px] font-bold uppercase tracking-wider">Update</span>
+                      <p className="text-sm font-bold text-white">Vertex v{updateAvailable.version}</p>
+                    </div>
+                    <p className="text-xs text-white/60 mb-3 leading-relaxed">
+                      A new version is available! Install now to get the latest features and bug fixes.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => installUpdate()}
+                        className="px-3 py-1.5 bg-white text-black text-xs font-bold rounded-lg hover:bg-white/90 transition-colors"
+                      >
+                        Install Update
+                      </button>
+                      <button 
+                        onClick={() => dismissUpdate()}
+                        className="px-3 py-1.5 bg-white/10 text-white text-xs font-medium rounded-lg hover:bg-white/20 transition-colors"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {showLegacyNotification && (
                   <div className="p-4 border-b border-white/5 hover:bg-white/5 transition-colors">
                     <p className="text-sm font-bold text-white mb-1">Found Device Library</p>
                     <p className="text-xs text-white/60 mb-3 leading-relaxed">
@@ -123,7 +151,9 @@ export default function Header() {
                       </button>
                     </div>
                   </div>
-                ) : (
+                )}
+                
+                {!showLegacyNotification && !updateAvailable && (
                   <div className="p-6 text-center">
                     <p className="text-sm text-white/40">No new notifications</p>
                   </div>

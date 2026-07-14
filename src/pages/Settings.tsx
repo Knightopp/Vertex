@@ -9,13 +9,21 @@ import { cn } from "@/lib/utils";
 import { steamSyncManager } from "@/services/SteamSyncManager";
 import { invoke } from "@tauri-apps/api/core";
 import { libraryManager } from "@/services/LibraryManager";
-
+import { useAppStore } from "@/stores/app-store";
+import { getVersion } from "@tauri-apps/api/app";
+import { useEffect } from "react";
 export default function Settings() {
   const { settings, updateSettings, isLoading } = useSettingsStore();
+  const { checkForUpdates, isCheckingUpdate, updateAvailable } = useAppStore();
+  const [appVersion, setAppVersion] = useState("1.0.0");
   const [activeTab, setActiveTab] = useState<"general" | "library" | "metadata" | "integrations">("general");
   const [newScanPath, setNewScanPath] = useState("");
   const [isSyncingSteam, setIsSyncingSteam] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(console.error);
+  }, []);
 
   if (isLoading) {
     return (
@@ -247,6 +255,28 @@ export default function Settings() {
                       <span className={cn("absolute inline-block h-5 w-5 transform rounded-full transition-transform duration-200 ease-in-out", settings.discordRichPresence ? "translate-x-8 bg-black" : "translate-x-1 bg-white/50")} />
                     </div>
                   </label>
+                </div>
+              </section>
+
+              <section>
+                <SectionHeading title="Application" />
+                <div className="mt-4 flex flex-col gap-4">
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-black/20 border border-white/5">
+                    <div>
+                      <h4 className="font-bold text-white text-lg">Vertex Updates</h4>
+                      <p className="text-white/50 text-sm">Current Version: v{appVersion}</p>
+                      {updateAvailable && (
+                        <p className="text-green-400 text-sm font-bold mt-1">Update v{updateAvailable.version} is available!</p>
+                      )}
+                    </div>
+                    <button 
+                      onClick={() => checkForUpdates(true)}
+                      disabled={isCheckingUpdate}
+                      className="px-6 py-2.5 rounded-xl bg-white hover:bg-white/90 disabled:opacity-50 text-black font-semibold transition-colors"
+                    >
+                      {isCheckingUpdate ? "Checking..." : "Check for Updates"}
+                    </button>
+                  </div>
                 </div>
               </section>
             </motion.div>

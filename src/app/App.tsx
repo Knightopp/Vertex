@@ -16,6 +16,7 @@ import Wishlist from "@/pages/Wishlist";
 import NotFound from "@/pages/NotFound";
 import OAuthRedirect from "@/pages/OAuthRedirect";
 import { UpdateManager } from "@/components/layout/UpdateManager";
+import { WhatsNewModal } from "@/components/layout/WhatsNewModal";
 import { useSettingsStore } from "@/stores/settings-store";
 import { processManager } from "@/services/ProcessManager";
 import { sessionManager } from "@/services/SessionManager";
@@ -154,6 +155,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <UpdateManager />
+      <WhatsNewModal />
       <Sonner />
       <AuthGuard>
         <BrowserRouter>
