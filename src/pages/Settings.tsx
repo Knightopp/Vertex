@@ -12,6 +12,8 @@ import { libraryManager } from "@/services/LibraryManager";
 import { useAppStore } from "@/stores/app-store";
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect } from "react";
+import { discordPresenceManager } from "@/services/DiscordPresenceManager";
+
 export default function Settings() {
   const { settings, updateSettings, isLoading } = useSettingsStore();
   const { checkForUpdates, isCheckingUpdate, updateAvailable } = useAppStore();
@@ -52,7 +54,14 @@ export default function Settings() {
   };
 
   const handleToggleDiscord = () => {
-    updateSettings({ discordRichPresence: !settings.discordRichPresence });
+    const newValue = !settings.discordRichPresence;
+    updateSettings({ discordRichPresence: newValue });
+    discordPresenceManager.setEnabled(newValue);
+    if (newValue) {
+      toast.success("Discord Rich Presence enabled");
+    } else {
+      toast.info("Discord Rich Presence disabled");
+    }
   };
 
   const handleAddScanPath = (e: React.FormEvent) => {
@@ -391,6 +400,26 @@ export default function Settings() {
               animate={{ opacity: 1, y: 0 }}
               className="flex flex-col gap-8"
             >
+              <section>
+                <SectionHeading title="Discord Integration" />
+                <p className="text-white/50 text-sm mt-2 mb-6 max-w-2xl">
+                  Display your current application status, page navigation, or active game session with dynamic game artwork on your Discord profile.
+                </p>
+
+                <div className="flex flex-col gap-4 p-6 rounded-2xl bg-black/20 border border-white/5">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <div>
+                      <h4 className="font-bold text-white text-lg">Enable Discord Rich Presence</h4>
+                      <p className="text-white/50 text-sm">Automatically update your Discord activity status based on what you're doing in Vertex.</p>
+                    </div>
+                    <div className="relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black cursor-pointer" onClick={handleToggleDiscord}>
+                      <div className={cn("absolute inset-0 rounded-full transition-colors", settings.discordRichPresence ? "bg-white" : "bg-white/10")} />
+                      <span className={cn("absolute inline-block h-5 w-5 transform rounded-full transition-transform duration-200 ease-in-out", settings.discordRichPresence ? "translate-x-8 bg-black" : "translate-x-1 bg-white/50")} />
+                    </div>
+                  </label>
+                </div>
+              </section>
+
               <section>
                 <SectionHeading title="Steam Integration" />
                 <p className="text-white/50 text-sm mt-2 mb-6 max-w-2xl">

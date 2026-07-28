@@ -1,5 +1,6 @@
 mod commands;
 mod db;
+mod discord;
 #[cfg(target_os = "windows")]
 mod hash_service;
 #[cfg(target_os = "windows")]
@@ -12,6 +13,7 @@ mod window_enum;
 use commands::migration::migrate_old_data;
 use commands::system::get_idle_duration_ms;
 use db::Database;
+use discord::{DiscordIpcClient, DiscordState};
 use std::sync::Mutex;
 #[cfg(desktop)]
 use tauri::menu::{Menu, MenuItem};
@@ -40,6 +42,7 @@ pub fn run() {
             println!("ARGS: {:?}", std::env::args().collect::<Vec<_>>());
 
             app.manage(DeepLinkState(Mutex::new(None)));
+            app.manage(DiscordState(Mutex::new(DiscordIpcClient::new())));
             let db = Database::new(app.handle()).expect("Failed to initialize database");
             app.manage(Mutex::new(db));
 
@@ -112,6 +115,8 @@ pub fn run() {
             commands::system::set_autostart,
             commands::system::launch_game,
             get_deep_link,
+            commands::discord::update_discord_presence,
+            commands::discord::clear_discord_presence,
         ]);
 
     #[cfg(desktop)]

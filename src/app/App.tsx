@@ -150,6 +150,8 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+import { DiscordPresenceListener } from "@/components/layout/DiscordPresenceListener";
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -159,6 +161,7 @@ const App = () => (
       <Sonner />
       <AuthGuard>
         <BrowserRouter>
+          <DiscordPresenceListener />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/apps" element={<Apps />} />
