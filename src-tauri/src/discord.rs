@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
 
-const DEFAULT_CLIENT_ID: &str = "1326109973325678714";
+const DEFAULT_CLIENT_ID: &str = "1526109973325676714";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiscordTimestamps {
