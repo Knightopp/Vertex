@@ -25,6 +25,12 @@ export interface DiscordActivityPayload {
   buttons?: DiscordButtonConfig[];
 }
 
+const IS_DEV = import.meta.env.DEV;
+
+// Publicly hosted fallback asset URLs on Github to avoid requiring manual uploads on the Discord Developer Portal
+const FALLBACK_LARGE_IMAGE_URL = "https://raw.githubusercontent.com/Knightopp/Vertex/main/public/images/vertex_logo.png";
+const FALLBACK_SMALL_IMAGE_URL = "https://raw.githubusercontent.com/Knightopp/Vertex/main/public/images/vertex_app_icon.png";
+
 export class DiscordPresenceManager {
   private isInitialized = false;
   private isEnabled = true;
@@ -44,6 +50,10 @@ export class DiscordPresenceManager {
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
+    if (IS_DEV) {
+      console.log("[Discord] Initializing...");
+    }
+
     const settings = settingsManager.getSettings();
     this.isEnabled = settings.discordRichPresence !== false;
     this.isInitialized = true;
@@ -59,6 +69,9 @@ export class DiscordPresenceManager {
   async shutdown(): Promise<void> {
     this.lastPayloadJson = null;
     this.currentMode = "disabled";
+    if (IS_DEV) {
+      console.log("[Discord] Disconnected");
+    }
     try {
       await invoke("clear_discord_presence");
     } catch (error) {
@@ -80,7 +93,7 @@ export class DiscordPresenceManager {
       details: "Browsing Library",
       state: "Ready to play",
       assets: {
-        large_image: "vertex_logo",
+        large_image: FALLBACK_LARGE_IMAGE_URL,
         large_text: "Vertex",
       },
       buttons: this.buttons,
@@ -133,15 +146,15 @@ export class DiscordPresenceManager {
       payload.assets = {
         large_image: artworkUrl,
         large_text: gameTitle,
-        small_image: "vertex_logo",
+        small_image: FALLBACK_SMALL_IMAGE_URL,
         small_text: "Vertex",
       };
     } else {
-      // Fallback to standard Vertex branding
+      // Fallback to standard Vertex branding URLs
       payload.assets = {
-        large_image: "vertex_logo",
+        large_image: FALLBACK_LARGE_IMAGE_URL,
         large_text: gameTitle,
-        small_image: "generic_game_icon",
+        small_image: FALLBACK_SMALL_IMAGE_URL,
         small_text: "Vertex",
       };
     }
@@ -164,7 +177,7 @@ export class DiscordPresenceManager {
       details: "Viewing Statistics",
       state: "Analyzing Playtime",
       assets: {
-        large_image: "vertex_logo",
+        large_image: FALLBACK_LARGE_IMAGE_URL,
         large_text: "Vertex",
       },
       buttons: this.buttons,
@@ -188,7 +201,7 @@ export class DiscordPresenceManager {
       details: "Customizing Vertex",
       state: "Settings",
       assets: {
-        large_image: "vertex_logo",
+        large_image: FALLBACK_LARGE_IMAGE_URL,
         large_text: "Vertex",
       },
       buttons: this.buttons,
@@ -259,11 +272,19 @@ export class DiscordPresenceManager {
 
     this.lastPayloadJson = payloadJson;
 
+    if (IS_DEV) {
+      console.log("[Discord] Updating Rich Presence...");
+    }
+
     try {
       await invoke("update_discord_presence", { activity: payload });
+      if (IS_DEV) {
+        console.log("[Discord] Activity updated successfully");
+      }
     } catch (error) {
-      // Quietly swallow connection/IPC error so app never crashes
-      console.warn("[DiscordPresenceManager] Could not send presence to Discord:", error);
+      if (IS_DEV) {
+        console.log(`[Discord] Connection failed: ${error}`);
+      }
     }
   }
 }

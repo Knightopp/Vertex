@@ -151,7 +151,17 @@ impl DiscordIpcClient {
             return true;
         }
 
+        let was_connected = self.connected;
         self.disconnect();
+
+        #[cfg(debug_assertions)]
+        {
+            if was_connected {
+                println!("[Discord] Reconnecting...");
+            } else {
+                println!("[Discord] Initializing...");
+            }
+        }
 
         if let Some(stream) = Self::connect_pipe() {
             self.stream = Some(stream);
@@ -163,16 +173,25 @@ impl DiscordIpcClient {
 
             if self.send_frame(0, &handshake_json).is_ok() {
                 self.connected = true;
+                #[cfg(debug_assertions)]
+                println!("[Discord] Connected");
                 return true;
             }
         }
 
+        #[cfg(debug_assertions)]
+        println!("[Discord] Connection failed: Discord not running");
         self.disconnect();
         false
     }
 
     pub fn set_activity(&mut self, activity: Option<DiscordActivity>) -> Result<(), String> {
+        #[cfg(debug_assertions)]
+        println!("[Discord] Updating Rich Presence...");
+
         if !self.ensure_connected() {
+            #[cfg(debug_assertions)]
+            println!("[Discord] Discord not running");
             return Err("Discord IPC pipe not available".to_string());
         }
 
@@ -194,14 +213,22 @@ impl DiscordIpcClient {
         .to_string();
 
         if let Err(e) = self.send_frame(1, &payload) {
+            #[cfg(debug_assertions)]
+            println!("[Discord] Connection failed: {}", e);
             self.disconnect();
             Err(format!("Failed to send activity to Discord: {}", e))
         } else {
+            #[cfg(debug_assertions)]
+            println!("[Discord] Activity updated successfully");
             Ok(())
         }
     }
 
     pub fn disconnect(&mut self) {
+        if self.connected {
+            #[cfg(debug_assertions)]
+            println!("[Discord] Disconnected");
+        }
         self.stream = None;
         self.connected = false;
     }
