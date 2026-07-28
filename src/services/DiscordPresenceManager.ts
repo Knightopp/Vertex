@@ -28,9 +28,9 @@ export interface DiscordActivityPayload {
 
 const IS_DEV = import.meta.env.DEV;
 
-// Fallback asset keys uploaded to the Discord Developer Portal
-const FALLBACK_LARGE_IMAGE_URL = "vertex-logo-v2";
-const FALLBACK_SMALL_IMAGE_URL = "vertex-app-icon-v2";
+// Discord Developer Portal asset keys
+const LOGO_ASSET_KEY = "vertex-logo-v2";
+const BANNER_ASSET_KEY = "vertex-banner-v2";
 
 export class DiscordPresenceManager {
   private isInitialized = false;
@@ -94,7 +94,7 @@ export class DiscordPresenceManager {
       details: "Browsing Library",
       state: "Ready to Play",
       assets: {
-        large_image: FALLBACK_LARGE_IMAGE_URL,
+        large_image: LOGO_ASSET_KEY,
         large_text: "Vertex",
       },
       buttons: this.buttons,
@@ -148,19 +148,19 @@ export class DiscordPresenceManager {
     };
 
     if (artworkUrl) {
-      // External Asset supported
+      // Dynamic game/app artwork icon is resolved
       payload.assets = {
         large_image: artworkUrl,
         large_text: cleanedTitle,
-        small_image: FALLBACK_LARGE_IMAGE_URL,
+        small_image: LOGO_ASSET_KEY,
         small_text: "Vertex Game Tracker",
       };
     } else {
-      // Fallback to standard Vertex branding
+      // Fallback: Large image is the Vertex banner, small image is the Vertex logo icon
       payload.assets = {
-        large_image: FALLBACK_LARGE_IMAGE_URL,
+        large_image: BANNER_ASSET_KEY,
         large_text: cleanedTitle,
-        small_image: FALLBACK_SMALL_IMAGE_URL,
+        small_image: LOGO_ASSET_KEY,
         small_text: "Vertex Game Tracker",
       };
     }
@@ -183,7 +183,7 @@ export class DiscordPresenceManager {
       details: "Viewing Statistics",
       state: "Analyzing Playtime",
       assets: {
-        large_image: FALLBACK_LARGE_IMAGE_URL,
+        large_image: LOGO_ASSET_KEY,
         large_text: "Vertex",
       },
       buttons: this.buttons,
@@ -207,7 +207,7 @@ export class DiscordPresenceManager {
       details: "Customizing Vertex",
       state: "Settings",
       assets: {
-        large_image: FALLBACK_LARGE_IMAGE_URL,
+        large_image: LOGO_ASSET_KEY,
         large_text: "Vertex",
       },
       buttons: this.buttons,
