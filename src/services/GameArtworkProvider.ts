@@ -25,19 +25,20 @@ export interface ArtworkResolutionOptions {
 export class GameArtworkProvider {
   private cache = new Map<string, string>();
 
+  // Use Clearbit CDN which serves clean square PNG brand logos and allows hotlinking/Discord media proxying.
   private static readonly POPULAR_APP_ICONS: Record<string, string> = {
-    "discord": "https://assets-global.website-files.com/6257adef93867e50d84d30e2/636e0a69f118df70ad7828d4_icon_clyde_blurple_RGB.png",
-    "visual studio code": "https://raw.githubusercontent.com/microsoft/vscode-icons/master/icons/stable/vscode.png",
-    "vscode": "https://raw.githubusercontent.com/microsoft/vscode-icons/master/icons/stable/vscode.png",
-    "photoshop": "https://raw.githubusercontent.com/adobe-photoshop/photoshop-brand-assets/master/photoshop_icon.png",
-    "adobe photoshop": "https://raw.githubusercontent.com/adobe-photoshop/photoshop-brand-assets/master/photoshop_icon.png",
-    "steam": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Steam_icon_logo.svg/512px-Steam_icon_logo.svg.png",
-    "google chrome": "https://upload.wikimedia.org/wikipedia/commons/e/e1/Google_Chrome_icon_%28February_2022%29.png",
-    "chrome": "https://upload.wikimedia.org/wikipedia/commons/e/e1/Google_Chrome_icon_%28February_2022%29.png",
-    "firefox": "https://upload.wikimedia.org/wikipedia/commons/a/a0/Firefox_logo%2C_2019.png",
-    "brave browser": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Brave_icon_sans_brand.svg/512px-Brave_icon_sans_brand.svg.png",
-    "brave": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Brave_icon_sans_brand.svg/512px-Brave_icon_sans_brand.svg.png",
-    "spotify": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Spotify_logo_without_text.svg/512px-Spotify_logo_without_text.svg.png",
+    "discord": "https://logo.clearbit.com/discord.com",
+    "visual studio code": "https://logo.clearbit.com/visualstudio.com",
+    "vscode": "https://logo.clearbit.com/visualstudio.com",
+    "photoshop": "https://logo.clearbit.com/adobe.com",
+    "adobe photoshop": "https://logo.clearbit.com/adobe.com",
+    "steam": "https://logo.clearbit.com/steampowered.com",
+    "google chrome": "https://logo.clearbit.com/google.com",
+    "chrome": "https://logo.clearbit.com/google.com",
+    "firefox": "https://logo.clearbit.com/mozilla.org",
+    "brave browser": "https://logo.clearbit.com/brave.com",
+    "brave": "https://logo.clearbit.com/brave.com",
+    "spotify": "https://logo.clearbit.com/spotify.com",
     "antigravity ide": "https://raw.githubusercontent.com/Knightopp/Vertex/main/public/images/vertex_logo_transparent.png",
     "antigravity": "https://raw.githubusercontent.com/Knightopp/Vertex/main/public/images/vertex_logo_transparent.png",
   };
