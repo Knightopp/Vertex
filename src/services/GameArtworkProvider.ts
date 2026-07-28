@@ -25,20 +25,20 @@ export interface ArtworkResolutionOptions {
 export class GameArtworkProvider {
   private cache = new Map<string, string>();
 
-  // Use Clearbit CDN which serves clean square PNG brand logos and allows hotlinking/Discord media proxying.
+  // Use jsDelivr CDN for dashboard-icons which serves direct PNG logos without redirects, preventing Discord media proxy failures.
   private static readonly POPULAR_APP_ICONS: Record<string, string> = {
-    "discord": "https://logo.clearbit.com/discord.com",
-    "visual studio code": "https://logo.clearbit.com/visualstudio.com",
-    "vscode": "https://logo.clearbit.com/visualstudio.com",
-    "photoshop": "https://logo.clearbit.com/adobe.com",
-    "adobe photoshop": "https://logo.clearbit.com/adobe.com",
-    "steam": "https://logo.clearbit.com/steampowered.com",
-    "google chrome": "https://logo.clearbit.com/google.com",
-    "chrome": "https://logo.clearbit.com/google.com",
-    "firefox": "https://logo.clearbit.com/mozilla.org",
-    "brave browser": "https://logo.clearbit.com/brave.com",
-    "brave": "https://logo.clearbit.com/brave.com",
-    "spotify": "https://logo.clearbit.com/spotify.com",
+    "discord": "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/discord.png",
+    "visual studio code": "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/visual-studio-code.png",
+    "vscode": "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/visual-studio-code.png",
+    "photoshop": "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/photoshop.png",
+    "adobe photoshop": "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/photoshop.png",
+    "steam": "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/steam.png",
+    "google chrome": "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/chrome.png",
+    "chrome": "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/chrome.png",
+    "firefox": "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/firefox.png",
+    "brave browser": "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/brave.png",
+    "brave": "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/brave.png",
+    "spotify": "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/spotify.png",
     "antigravity ide": "https://raw.githubusercontent.com/Knightopp/Vertex/main/public/images/vertex_logo_transparent.png",
     "antigravity": "https://raw.githubusercontent.com/Knightopp/Vertex/main/public/images/vertex_logo_transparent.png",
   };
