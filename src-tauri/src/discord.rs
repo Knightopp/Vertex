@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const DEFAULT_CLIENT_ID: &str = "1344606775618474026";
+const DEFAULT_CLIENT_ID: &str = "1326109973325678714";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiscordTimestamps {
@@ -59,15 +59,6 @@ impl PipeStream {
             PipeStream::Windows(f) => f.write_all(buf),
             #[cfg(not(target_os = "windows"))]
             PipeStream::Unix(s) => s.write_all(buf),
-        }
-    }
-
-    fn read_exact(&mut self, buf: &mut [u8]) -> std::io::Result<()> {
-        match self {
-            #[cfg(target_os = "windows")]
-            PipeStream::Windows(f) => f.read_exact(buf),
-            #[cfg(not(target_os = "windows"))]
-            PipeStream::Unix(s) => s.read_exact(buf),
         }
     }
 
@@ -151,16 +142,6 @@ impl DiscordIpcClient {
         stream.write_all(&header)?;
         stream.write_all(payload.as_bytes())?;
         stream.flush()?;
-
-        // Read handshake response or ACK
-        let mut resp_header = [0u8; 8];
-        if stream.read_exact(&mut resp_header).is_ok() {
-            let resp_len = u32::from_le_bytes(resp_header[4..8].try_into().unwrap()) as usize;
-            if resp_len > 0 {
-                let mut resp_body = vec![0u8; resp_len];
-                let _ = stream.read_exact(&mut resp_body);
-            }
-        }
 
         Ok(())
     }
