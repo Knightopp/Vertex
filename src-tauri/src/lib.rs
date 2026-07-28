@@ -13,7 +13,7 @@ mod window_enum;
 use commands::migration::migrate_old_data;
 use commands::system::get_idle_duration_ms;
 use db::Database;
-use discord::{DiscordIpcClient, DiscordState};
+use discord::{DiscordIpcClientWrapper, DiscordState};
 use std::sync::Mutex;
 #[cfg(desktop)]
 use tauri::menu::{Menu, MenuItem};
@@ -42,7 +42,7 @@ pub fn run() {
             println!("ARGS: {:?}", std::env::args().collect::<Vec<_>>());
 
             app.manage(DeepLinkState(Mutex::new(None)));
-            app.manage(DiscordState(Mutex::new(DiscordIpcClient::new())));
+            app.manage(DiscordState(Mutex::new(DiscordIpcClientWrapper::new())));
             let db = Database::new(app.handle()).expect("Failed to initialize database");
             app.manage(Mutex::new(db));
 

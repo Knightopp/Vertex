@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::io::Write;
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
+use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
 
 const DEFAULT_CLIENT_ID: &str = "1326109973325678714";
 
@@ -45,109 +44,23 @@ pub struct DiscordActivity {
     pub buttons: Option<Vec<DiscordButton>>,
 }
 
-enum PipeStream {
-    #[cfg(target_os = "windows")]
-    Windows(std::fs::File),
-    #[cfg(not(target_os = "windows"))]
-    Unix(std::os::unix::net::UnixStream),
-}
-
-impl PipeStream {
-    fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
-        match self {
-            #[cfg(target_os = "windows")]
-            PipeStream::Windows(f) => f.write_all(buf),
-            #[cfg(not(target_os = "windows"))]
-            PipeStream::Unix(s) => s.write_all(buf),
-        }
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        match self {
-            #[cfg(target_os = "windows")]
-            PipeStream::Windows(f) => f.flush(),
-            #[cfg(not(target_os = "windows"))]
-            PipeStream::Unix(s) => s.flush(),
-        }
-    }
-}
-
-pub struct DiscordIpcClient {
-    stream: Option<PipeStream>,
+pub struct DiscordIpcClientWrapper {
+    client: Option<DiscordIpcClient>,
     client_id: String,
     connected: bool,
 }
 
-impl DiscordIpcClient {
+impl DiscordIpcClientWrapper {
     pub fn new() -> Self {
         Self {
-            stream: None,
+            client: None,
             client_id: DEFAULT_CLIENT_ID.to_string(),
             connected: false,
         }
     }
 
-    fn connect_pipe() -> Option<PipeStream> {
-        #[cfg(target_os = "windows")]
-        {
-            for i in 0..10 {
-                let path = format!(r"\\.\pipe\discord-ipc-{}", i);
-                if let Ok(file) = std::fs::OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .open(&path)
-                {
-                    return Some(PipeStream::Windows(file));
-                }
-            }
-        }
-
-        #[cfg(not(target_os = "windows"))]
-        {
-            let env_vars = ["XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP"];
-            let mut search_paths: Vec<String> = env_vars
-                .iter()
-                .filter_map(|v| std::env::var(v).ok())
-                .collect();
-            search_paths.push("/tmp".to_string());
-
-            for base in search_paths {
-                for i in 0..10 {
-                    let path = format!("{}/discord-ipc-{}", base, i);
-                    if let Ok(stream) = std::os::unix::net::UnixStream::connect(&path) {
-                        return Some(PipeStream::Unix(stream));
-                    }
-                    let flatpak_path = format!("{}/app/com.discordapp.Discord/discord-ipc-{}", base, i);
-                    if let Ok(stream) = std::os::unix::net::UnixStream::connect(&flatpak_path) {
-                        return Some(PipeStream::Unix(stream));
-                    }
-                }
-            }
-        }
-
-        None
-    }
-
-    fn send_frame(&mut self, opcode: u32, payload: &str) -> std::io::Result<()> {
-        let stream = match self.stream.as_mut() {
-            Some(s) => s,
-            None => return Err(std::io::Error::new(std::io::ErrorKind::NotConnected, "Not connected")),
-        };
-
-        let len = payload.len() as u32;
-        let mut header = Vec::with_capacity(8);
-        header.extend_from_slice(&opcode.to_le_bytes());
-        header.extend_from_slice(&len.to_le_bytes());
-
-        stream.write_all(&header)?;
-        stream.write_all(payload.as_bytes())?;
-        stream.flush()?;
-
-        Ok(())
-    }
-
     pub fn ensure_connected(&mut self) -> bool {
-        if self.connected && self.stream.is_some() {
+        if self.connected && self.client.is_some() {
             return true;
         }
 
@@ -163,20 +76,17 @@ impl DiscordIpcClient {
             }
         }
 
-        if let Some(stream) = Self::connect_pipe() {
-            self.stream = Some(stream);
-            let handshake_json = serde_json::json!({
-                "v": 1,
-                "client_id": self.client_id
-            })
-            .to_string();
-
-            if self.send_frame(0, &handshake_json).is_ok() {
-                self.connected = true;
-                #[cfg(debug_assertions)]
-                println!("[Discord] Connected");
-                return true;
+        match DiscordIpcClient::new(&self.client_id) {
+            Ok(mut client) => {
+                if client.connect().is_ok() {
+                    self.client = Some(client);
+                    self.connected = true;
+                    #[cfg(debug_assertions)]
+                    println!("[Discord] Connected");
+                    return true;
+                }
             }
+            Err(_) => {}
         }
 
         #[cfg(debug_assertions)]
@@ -189,37 +99,87 @@ impl DiscordIpcClient {
         #[cfg(debug_assertions)]
         println!("[Discord] Updating Rich Presence...");
 
+        if activity.is_none() {
+            #[cfg(debug_assertions)]
+            println!("[Discord] Activity payload: null");
+            if let Some(ref mut client) = self.client {
+                let _ = client.clear_activity();
+            }
+            return Ok(());
+        }
+
+        // Print complete activity payload in JSON format before sending
+        let activity_payload = activity.clone().unwrap();
+        #[cfg(debug_assertions)]
+        {
+            if let Ok(payload_json) = serde_json::to_string(&activity_payload) {
+                println!("[Discord] Activity payload: {}", payload_json);
+            }
+        }
+
         if !self.ensure_connected() {
             #[cfg(debug_assertions)]
             println!("[Discord] Discord not running");
             return Err("Discord IPC pipe not available".to_string());
         }
 
-        let pid = std::process::id();
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_millis())
-            .unwrap_or(0)
-            .to_string();
+        let client = match self.client.as_mut() {
+            Some(c) => c,
+            None => return Err("Discord IPC client not connected".to_string()),
+        };
 
-        let payload = serde_json::json!({
-            "cmd": "SET_ACTIVITY",
-            "args": {
-                "pid": pid,
-                "activity": activity
-            },
-            "nonce": nonce
-        })
-        .to_string();
+        // Map DiscordActivity into discord_rich_presence::activity::Activity
+        let mut discord_activity = activity::Activity::new();
 
-        #[cfg(debug_assertions)]
-        println!("[Discord] Activity payload: {}", payload);
+        if let Some(details) = &activity_payload.details {
+            discord_activity = discord_activity.details(details);
+        }
 
-        if let Err(e) = self.send_frame(1, &payload) {
+        if let Some(state) = &activity_payload.state {
+            discord_activity = discord_activity.state(state);
+        }
+
+        if let Some(ts) = &activity_payload.timestamps {
+            let mut timestamps = activity::Timestamps::new();
+            if let Some(start) = ts.start {
+                timestamps = timestamps.start(start as i64);
+            }
+            if let Some(end) = ts.end {
+                timestamps = timestamps.end(end as i64);
+            }
+            discord_activity = discord_activity.timestamps(timestamps);
+        }
+
+        if let Some(ast) = &activity_payload.assets {
+            let mut assets = activity::Assets::new();
+            if let Some(large_image) = &ast.large_image {
+                assets = assets.large_image(large_image);
+            }
+            if let Some(large_text) = &ast.large_text {
+                assets = assets.large_text(large_text);
+            }
+            if let Some(small_image) = &ast.small_image {
+                assets = assets.small_image(small_image);
+            }
+            if let Some(small_text) = &ast.small_text {
+                assets = assets.small_text(small_text);
+            }
+            discord_activity = discord_activity.assets(assets);
+        }
+
+        if let Some(btns) = &activity_payload.buttons {
+            let buttons = btns
+                .iter()
+                .map(|b| activity::Button::new(&b.label, &b.url))
+                .collect();
+            discord_activity = discord_activity.buttons(buttons);
+        }
+
+        if let Err(e) = client.set_activity(discord_activity) {
             #[cfg(debug_assertions)]
             println!("[Discord] Connection failed: {}", e);
             self.disconnect();
-            Err(format!("Failed to send activity to Discord: {}", e))
+            Err(format!("Failed to set activity: {}", e))
         } else {
             #[cfg(debug_assertions)]
             println!("[Discord] Activity updated successfully");
@@ -231,10 +191,13 @@ impl DiscordIpcClient {
         if self.connected {
             #[cfg(debug_assertions)]
             println!("[Discord] Disconnected");
+            if let Some(mut client) = self.client.take() {
+                let _ = client.close();
+            }
         }
-        self.stream = None;
+        self.client = None;
         self.connected = false;
     }
 }
 
-pub struct DiscordState(pub Mutex<DiscordIpcClient>);
+pub struct DiscordState(pub Mutex<DiscordIpcClientWrapper>);
