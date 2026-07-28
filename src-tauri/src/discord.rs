@@ -64,6 +64,7 @@ impl DiscordIpcClientWrapper {
             return true;
         }
 
+        #[cfg(debug_assertions)]
         let was_connected = self.connected;
         self.disconnect();
 

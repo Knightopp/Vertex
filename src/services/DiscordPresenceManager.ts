@@ -29,8 +29,8 @@ export interface DiscordActivityPayload {
 const IS_DEV = import.meta.env.DEV;
 
 // Fallback asset keys uploaded to the Discord Developer Portal
-const FALLBACK_LARGE_IMAGE_URL = "vertex-logo";
-const FALLBACK_SMALL_IMAGE_URL = "vertex-app-icon";
+const FALLBACK_LARGE_IMAGE_URL = "vertex-logo-v2";
+const FALLBACK_SMALL_IMAGE_URL = "vertex-app-icon-v2";
 
 export class DiscordPresenceManager {
   private isInitialized = false;
