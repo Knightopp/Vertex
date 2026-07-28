@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { settingsManager } from "./SettingsManager";
 import { gameArtworkProvider } from "./GameArtworkProvider";
+import { PresenceFormatter } from "./PresenceFormatter";
 
 export interface DiscordButtonConfig {
   label: String;
@@ -91,7 +92,7 @@ export class DiscordPresenceManager {
 
     const payload: DiscordActivityPayload = {
       details: "Browsing Library",
-      state: "Ready to play",
+      state: "Ready to Play",
       assets: {
         large_image: FALLBACK_LARGE_IMAGE_URL,
         large_text: "Vertex",
@@ -103,7 +104,7 @@ export class DiscordPresenceManager {
   }
 
   /**
-   * Updates presence to Tracking state for a given game.
+   * Updates presence to Tracking state for a given game or application.
    */
   async updateTracking(game: any, sessionStart?: number | Date): Promise<void> {
     if (!game) {
@@ -127,14 +128,19 @@ export class DiscordPresenceManager {
 
     this.sessionStartTime = startTimeMs;
 
-    const gameTitle = game.title || game.name || "a Game";
+    const gameTitle = game.title || game.name || "Unknown Application";
+    const entryType = game.type || "game"; // "game" or "application"
+    
+    const details = PresenceFormatter.getDetails(gameTitle, entryType);
+    const state = PresenceFormatter.getState(entryType);
+    const cleanedTitle = PresenceFormatter.cleanDisplayName(gameTitle);
+    
     const artworkUrl = await gameArtworkProvider.resolveArtwork(game);
-
     const startUnixSeconds = Math.floor(startTimeMs / 1000);
 
     const payload: DiscordActivityPayload = {
-      details: `Tracking ${gameTitle}`,
-      state: "In Game Session",
+      details,
+      state,
       timestamps: {
         start: startUnixSeconds,
       },
@@ -145,17 +151,17 @@ export class DiscordPresenceManager {
       // External Asset supported
       payload.assets = {
         large_image: artworkUrl,
-        large_text: gameTitle,
-        small_image: FALLBACK_SMALL_IMAGE_URL,
-        small_text: "Vertex",
+        large_text: cleanedTitle,
+        small_image: FALLBACK_LARGE_IMAGE_URL,
+        small_text: "Vertex Game Tracker",
       };
     } else {
-      // Fallback to standard Vertex branding URLs
+      // Fallback to standard Vertex branding
       payload.assets = {
         large_image: FALLBACK_LARGE_IMAGE_URL,
-        large_text: gameTitle,
+        large_text: cleanedTitle,
         small_image: FALLBACK_SMALL_IMAGE_URL,
-        small_text: "Vertex",
+        small_text: "Vertex Game Tracker",
       };
     }
 
@@ -274,6 +280,7 @@ export class DiscordPresenceManager {
 
     if (IS_DEV) {
       console.log("[Discord] Updating Rich Presence...");
+      console.log("[Discord] Activity payload:", payload);
     }
 
     try {
