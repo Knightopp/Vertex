@@ -71,6 +71,17 @@ export class ProcessManager {
     try {
       if (!process.exePath || !process.hash) return; // Hash must be present from Rust
 
+      const exeNameLower = process.name.toLowerCase();
+      const exePathLower = process.exePath.toLowerCase();
+      if (
+        exeNameLower.includes("vazorism") || 
+        exeNameLower.includes("vertex") ||
+        exePathLower.includes("vazorism") || 
+        exePathLower.includes("vertex")
+      ) {
+        return; // Ignore tracking ourselves
+      }
+
       // Deduplicate: See if we already have this in Library via Hash or Path
       const entries = await libraryManager.getAllEntries();
       let libraryEntry = entries.find(e => 
@@ -156,6 +167,17 @@ export class ProcessManager {
 
   private async handleProcessTerminated(process: ProcessInfo): Promise<void> {
     try {
+      const exeNameLower = process.name.toLowerCase();
+      const exePathLower = process.exePath ? process.exePath.toLowerCase() : "";
+      if (
+        exeNameLower.includes("vazorism") || 
+        exeNameLower.includes("vertex") ||
+        exePathLower.includes("vazorism") || 
+        exePathLower.includes("vertex")
+      ) {
+        return; // Ignore ourselves
+      }
+
       const entries = await libraryManager.getAllEntries();
       let libraryEntry = entries.find(e => 
         (e.metadata?.hash && process.hash && e.metadata.hash === process.hash) || 
