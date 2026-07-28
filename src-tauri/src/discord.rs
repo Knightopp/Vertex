@@ -212,6 +212,9 @@ impl DiscordIpcClient {
         })
         .to_string();
 
+        #[cfg(debug_assertions)]
+        println!("[Discord] Activity payload: {}", payload);
+
         if let Err(e) = self.send_frame(1, &payload) {
             #[cfg(debug_assertions)]
             println!("[Discord] Connection failed: {}", e);
