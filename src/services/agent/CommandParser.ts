@@ -19,17 +19,17 @@ interface CommandTemplate {
 
 export class CommandParser {
   private websiteAliases: Array<{ alias: string; name: string; url: string }> = [
-    { alias: "yt", name: "YouTube", url: "https://youtube.com" },
-    { alias: "youtube", name: "YouTube", url: "https://youtube.com" },
+    { alias: "yt", name: "YouTube", url: "https://www.youtube.com" },
+    { alias: "youtube", name: "YouTube", url: "https://www.youtube.com" },
     { alias: "dc", name: "Discord", url: "https://discord.com/app" },
     { alias: "discord", name: "Discord", url: "https://discord.com/app" },
     { alias: "github", name: "GitHub", url: "https://github.com" },
     { alias: "gh", name: "GitHub", url: "https://github.com" },
-    { alias: "reddit", name: "Reddit", url: "https://reddit.com" },
+    { alias: "reddit", name: "Reddit", url: "https://www.reddit.com" },
     { alias: "twitter", name: "Twitter", url: "https://twitter.com" },
     { alias: "x", name: "X", url: "https://x.com" },
-    { alias: "twitch", name: "Twitch", url: "https://twitch.tv" },
-    { alias: "netflix", name: "Netflix", url: "https://netflix.com" },
+    { alias: "twitch", name: "Twitch", url: "https://www.twitch.tv" },
+    { alias: "netflix", name: "Netflix", url: "https://www.netflix.com" },
     { alias: "steam", name: "Steam", url: "steam://open/main" },
     { alias: "epic", name: "Epic Games", url: "com.epicgames.launcher://" }
   ];
