@@ -129,7 +129,7 @@ export class AppController {
       ],
       handler: async (params) => {
         let url = params.url;
-        if (!url.startsWith("http")) {
+        if (!url.includes("://")) {
             url = `https://${url}`;
         }
         console.log(`[AppController] Opening website: ${url}`);

@@ -18,19 +18,21 @@ interface CommandTemplate {
 }
 
 export class CommandParser {
-  private websiteAliases: Record<string, string> = {
-    yt: "YouTube",
-    youtube: "YouTube",
-    dc: "Discord",
-    discord: "Discord",
-    ps: "Photoshop",
-    ae: "After Effects",
-    github: "GitHub",
-    gh: "GitHub",
-    reddit: "Reddit",
-    twitter: "Twitter",
-    x: "X"
-  };
+  private websiteAliases: Array<{ alias: string; name: string; url: string }> = [
+    { alias: "yt", name: "YouTube", url: "https://youtube.com" },
+    { alias: "youtube", name: "YouTube", url: "https://youtube.com" },
+    { alias: "dc", name: "Discord", url: "https://discord.com/app" },
+    { alias: "discord", name: "Discord", url: "https://discord.com/app" },
+    { alias: "github", name: "GitHub", url: "https://github.com" },
+    { alias: "gh", name: "GitHub", url: "https://github.com" },
+    { alias: "reddit", name: "Reddit", url: "https://reddit.com" },
+    { alias: "twitter", name: "Twitter", url: "https://twitter.com" },
+    { alias: "x", name: "X", url: "https://x.com" },
+    { alias: "twitch", name: "Twitch", url: "https://twitch.tv" },
+    { alias: "netflix", name: "Netflix", url: "https://netflix.com" },
+    { alias: "steam", name: "Steam", url: "steam://open/main" },
+    { alias: "epic", name: "Epic Games", url: "com.epicgames.launcher://" }
+  ];
 
   /**
    * Deterministic parser with fuzzy matching support via Fuse.js.
@@ -123,12 +125,12 @@ export class CommandParser {
     }
 
     // 3. Websites / Aliases
-    for (const [alias, name] of Object.entries(this.websiteAliases)) {
+    for (const site of this.websiteAliases) {
       templates.push({
-        title: `Open ${name}`,
+        title: `Open ${site.name}`,
         actionId: 'open_website',
-        parameters: { url: name.toLowerCase() },
-        searchTerms: [`open ${alias}`, `open ${name}`, alias, name, `go to ${name}`]
+        parameters: { url: site.url },
+        searchTerms: [`open ${site.alias}`, `open ${site.name}`, site.alias, site.name, `go to ${site.name}`]
       });
     }
 

@@ -158,8 +158,6 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
 };
 
 import { DiscordPresenceListener } from "@/components/layout/DiscordPresenceListener";
-
-import { DiscordPresenceListener } from "@/components/layout/DiscordPresenceListener";
 import { useAgentStore } from "@/stores/agent-store";
 
 const AppContent = () => {
