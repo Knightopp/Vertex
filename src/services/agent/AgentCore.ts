@@ -6,7 +6,13 @@ import { shortcutController } from "./controllers/ShortcutController";
 import { commandParser } from "./CommandParser";
 import { actionExecutor } from "./ActionExecutor";
 import { useAgentStore } from "../../stores/agent-store";
-import { useSettingsStore } from "../../stores/settings-store";
+
+export function registerAgentActions() {
+  appController.init();
+  systemController.init();
+  windowController.init();
+  presetController.init();
+}
 
 export class AgentCore {
   private initialized = false;
@@ -14,20 +20,10 @@ export class AgentCore {
   async init() {
     if (this.initialized) return;
 
-    // Check if agent is enabled in settings
-    const { settings } = useSettingsStore.getState();
-    if (!settings.agentEnabled) {
-      console.log("[AgentCore] Agent is disabled in settings. Skipping initialization.");
-      return;
-    }
+    // Controllers will self-manage whether they should be active based on settings.
+    // We must initialize them regardless so that actions are registered for the UI.
 
-    console.log("[AgentCore] Initializing Vertex Agent...");
-
-    // Initialize all controllers (registers actions)
-    appController.init();
-    systemController.init();
-    windowController.init();
-    presetController.init();
+    // Note: ActionRegistry is populated synchronously by registerAgentActions() called in App.tsx
     await shortcutController.init();
 
     useAgentStore.getState().setRunning(true);

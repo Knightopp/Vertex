@@ -3,10 +3,12 @@ import { motion } from "framer-motion";
 import { Plus, Trash2, Edit2, Play, Settings, ArrowRight } from "lucide-react";
 import { usePresetStore, Preset, PresetAction } from "../../../stores/preset-store";
 import { actionRegistry } from "../../../services/agent/ActionRegistry";
+import { useAgentStore } from "../../../stores/agent-store";
 import SectionHeading from "../../../components/common/SectionHeading";
 import { cn } from "../../../lib/utils";
 
 export default function PresetEditor() {
+  const { isRunning } = useAgentStore(); // Force re-render when Agent initializes
   const { presets, addPreset, updatePreset, removePreset } = usePresetStore();
   const [selectedId, setSelectedId] = useState<string | null>(presets[0]?.id || null);
 
@@ -78,7 +80,7 @@ export default function PresetEditor() {
                     {index + 1}
                   </span>
                   <select
-                    className="bg-black/60 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none"
+                    className="bg-black/60 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none flex-1 max-w-[250px]"
                     value={action.actionId}
                     onChange={(e) => {
                       const newId = e.target.value;
@@ -91,8 +93,13 @@ export default function PresetEditor() {
                       updateAction(action.id, type, { actionId: newId, parameters: newParams });
                     }}
                   >
+                    {availableActions.length === 0 && (
+                      <option disabled value="">No actions registered...</option>
+                    )}
                     {availableActions.map(def => (
-                      <option key={def.id} value={def.id}>{def.name}</option>
+                      <option key={def.id} value={def.id} className="bg-[#111111] text-white">
+                        {def.name}
+                      </option>
                     ))}
                   </select>
                 </div>

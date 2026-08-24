@@ -24,7 +24,10 @@ import { processManager } from "@/services/ProcessManager";
 import { sessionManager } from "@/services/SessionManager";
 import { syncManager } from "@/services/SyncManager";
 import { libraryManager } from "@/services/LibraryManager";
-import { agentCore } from "@/services/agent/AgentCore";
+import { agentCore, registerAgentActions } from "@/services/agent/AgentCore";
+
+// Synchronously register all agent actions before React boots
+registerAgentActions();
 
 import React, { useEffect } from "react";
 import { useAuthStore } from "@/stores/auth-store";
