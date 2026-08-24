@@ -178,6 +178,11 @@ const AppContent = () => {
 
   // If this window is the agent command bar, render it directly without auth
   if (new URLSearchParams(window.location.search).get('w') === 'cmd') {
+    // Make the window body transparent so the frosted glass effect works
+    document.documentElement.style.background = 'transparent';
+    document.body.style.background = 'transparent';
+    const root = document.getElementById('root');
+    if (root) root.style.background = 'transparent';
     return <AgentCommandBar />;
   }
   
