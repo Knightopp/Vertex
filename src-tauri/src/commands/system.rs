@@ -227,8 +227,8 @@ pub fn take_screenshot(app_handle: tauri::AppHandle) -> Result<String, String> {
                 .ok_or("Failed to create image buffer")?;
                 
             let timestamp = Local::now().format("%Y%m%d_%H%M%S").to_string();
-            let app_dir = app_handle.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
-            let screenshots_dir = app_dir.join("Screenshots");
+            let desktop_dir = app_handle.path().desktop_dir().unwrap_or_else(|_| PathBuf::from("."));
+            let screenshots_dir = desktop_dir.join("Vertex Agent").join("Screenshots");
             std::fs::create_dir_all(&screenshots_dir).map_err(|e| e.to_string())?;
             
             let filepath = screenshots_dir.join(format!("Screenshot_{}.png", timestamp));
@@ -259,8 +259,8 @@ pub fn start_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
     }
 
     let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
-    let app_dir = app_handle.path().app_data_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-    let recordings_dir = app_dir.join("Recordings");
+    let desktop_dir = app_handle.path().desktop_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let recordings_dir = desktop_dir.join("Vertex Agent").join("Recordings");
     std::fs::create_dir_all(&recordings_dir).map_err(|e| e.to_string())?;
     
     let filepath = recordings_dir.join(format!("Record_{}.mp4", timestamp));
