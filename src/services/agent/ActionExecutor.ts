@@ -36,7 +36,9 @@ export class ActionExecutor {
       
       let details = action.name;
       if (parameters && Object.keys(parameters).length > 0) {
-        details += ` (${JSON.stringify(parameters)})`;
+        if (parameters.appName) details = `Launched ${parameters.appName}`;
+        else if (parameters.url) details = `Opened ${parameters.url}`;
+        else details += ` (${JSON.stringify(parameters)})`;
       }
 
       useHistoryStore.getState().addEntry({
@@ -44,6 +46,23 @@ export class ActionExecutor {
         details,
         status: "success",
       });
+
+      // Show native OS notification if available
+      try {
+        if ("Notification" in window) {
+          if (Notification.permission === "granted") {
+            new Notification("Vertex Agent", { body: `✓ ${details}` });
+          } else if (Notification.permission !== "denied") {
+            Notification.requestPermission().then((perm) => {
+              if (perm === "granted") {
+                new Notification("Vertex Agent", { body: `✓ ${details}` });
+              }
+            });
+          }
+        }
+      } catch (notifErr) {
+        console.warn("[ActionExecutor] Could not trigger native notification:", notifErr);
+      }
     } catch (error) {
       console.error(`[ActionExecutor] Error executing ${actionId}:`, error);
       
@@ -58,6 +77,12 @@ export class ActionExecutor {
         details,
         status: "error",
       });
+
+      try {
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("Vertex Agent Error", { body: `✗ ${details}` });
+        }
+      } catch (_) {}
     }
   }
 }
