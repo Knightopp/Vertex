@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   favoriteGamesOrder: [],
   tutorialCompleted: false,
   agentEnabled: false,
-  agentGlobalShortcut: "CommandOrControl+Shift+Space",
+  agentGlobalShortcut: "CommandOrControl+Alt+Space",
   agentScreenshotDir: "",
   agentRecordingDir: "",
 };
@@ -93,6 +93,10 @@ export class SettingsManager {
       }
       if (data) {
         this.cache = { ...DEFAULT_SETTINGS, ...JSON.parse(data) };
+        if (this.cache.agentGlobalShortcut === "CommandOrControl+Shift+Space") {
+          this.cache.agentGlobalShortcut = "CommandOrControl+Alt+Space";
+          localStorage.setItem(key, JSON.stringify(this.cache));
+        }
       } else {
         this.cache = { ...DEFAULT_SETTINGS };
       }
