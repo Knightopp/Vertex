@@ -123,7 +123,31 @@ pub fn run() {
                         ),
                         move |_app, _shortcut, event| {
                             if event.state() == ShortcutState::Pressed {
-                                let _ = handle.emit("agent-toggle", ());
+                                if let Some(cmd_win) = handle.get_webview_window("agent-command-bar") {
+                                    let is_visible = cmd_win.is_visible().unwrap_or(false);
+                                    if is_visible {
+                                        let _ = cmd_win.hide();
+                                    } else {
+                                        // Get cursor position and position the window near it
+                                        #[cfg(target_os = "windows")]
+                                        {
+                                            use windows::Win32::Foundation::POINT;
+                                            use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+                                            let mut pt = POINT { x: 0, y: 0 };
+                                            unsafe { let _ = GetCursorPos(&mut pt); }
+                                            // Offset slightly so it doesn't cover the cursor
+                                            let x = pt.x as i32;
+                                            let y = pt.y as i32 - 20;
+                                            let _ = cmd_win.set_position(tauri::PhysicalPosition::new(x, y));
+                                        }
+                                        let _ = cmd_win.show();
+                                        let _ = cmd_win.set_always_on_top(true);
+                                        let _ = cmd_win.set_focus();
+                                    }
+                                } else {
+                                    // Fallback: toggle command bar inside main window
+                                    let _ = handle.emit("agent-toggle", ());
+                                }
                             }
                         },
                     )

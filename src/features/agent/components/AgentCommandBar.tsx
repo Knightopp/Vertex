@@ -38,8 +38,17 @@ export const AgentCommandBar: React.FC<AgentCommandBarProps> = ({ embedded, onCl
       }
     };
 
+    // Also hide when window loses focus (user clicks away)
+    const handleBlur = async () => {
+      await hideCommandBar();
+    };
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("blur", handleBlur);
+    };
   }, []);
 
   useEffect(() => {
