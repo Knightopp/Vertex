@@ -18,6 +18,8 @@ use std::sync::Mutex;
 #[cfg(desktop)]
 use tauri::menu::{Menu, MenuItem};
 use tauri::{Emitter, Manager, State};
+#[cfg(desktop)]
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, ShortcutState};
 
 struct DeepLinkState(Mutex<Option<String>>);
 
@@ -107,6 +109,27 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // Register Ctrl+Alt+Space globally in Rust for reliability
+            #[cfg(desktop)]
+            {
+                let handle = app.handle().clone();
+                app.handle()
+                    .global_shortcut()
+                    .on_shortcut(
+                        tauri_plugin_global_shortcut::Shortcut::new(
+                            Some(Modifiers::CONTROL | Modifiers::ALT),
+                            Code::Space,
+                        ),
+                        move |_app, _shortcut, event| {
+                            if event.state() == ShortcutState::Pressed {
+                                let _ = handle.emit("agent-toggle", ());
+                            }
+                        },
+                    )
+                    .ok();
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

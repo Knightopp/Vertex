@@ -159,9 +159,22 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
 
 import { DiscordPresenceListener } from "@/components/layout/DiscordPresenceListener";
 import { useAgentStore } from "@/stores/agent-store";
+import { listen } from "@tauri-apps/api/event";
+import { isTauriEnvironment } from "@/lib/tauri-ipc";
 
 const AppContent = () => {
   const { isCommandInterfaceOpen, setCommandInterfaceOpen } = useAgentStore();
+
+  useEffect(() => {
+    if (!isTauriEnvironment()) return;
+    let unlisten: (() => void) | undefined;
+    listen("agent-toggle", () => {
+      useAgentStore.getState().setCommandInterfaceOpen(
+        !useAgentStore.getState().isCommandInterfaceOpen
+      );
+    }).then((fn) => { unlisten = fn; }).catch(console.error);
+    return () => { unlisten?.(); };
+  }, []);
   
   return (
     <>
