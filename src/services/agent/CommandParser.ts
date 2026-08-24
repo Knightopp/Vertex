@@ -70,6 +70,26 @@ export class CommandParser {
     // Exact/Regex matchers for dynamic commands
     const dynamicResults: ParsedCommand[] = [];
     
+    // 0. Quick keyboard power shortcuts
+    if (lowerText === 'sh' || lowerText === 'qwe') {
+      return [{
+        title: "Shutdown PC",
+        actionId: "shutdown",
+        parameters: {},
+        originalText: text,
+        score: -2
+      }];
+    }
+    if (lowerText === 'sl') {
+      return [{
+        title: "Sleep PC",
+        actionId: "sleep",
+        parameters: {},
+        originalText: text,
+        score: -2
+      }];
+    }
+
     // 1. Custom URL or domain (e.g. "hello.com", "open reddit.com/r/gaming", "https://xyz.org")
     const cleanUrlQuery = lowerText.replace(/^(?:open|go\s+to|visit|launch)\s+/i, '').trim();
     const urlPattern = /^(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}(?:\/[^\s]*)?)$/i;
@@ -219,13 +239,13 @@ export class CommandParser {
         title: "Shutdown PC",
         actionId: "shutdown",
         parameters: {},
-        searchTerms: ["shutdown", "shut down", "turn off", "power off", "shutdown pc"]
+        searchTerms: ["sh", "qwe", "shutdown", "shut down", "turn off", "power off", "shutdown pc"]
       },
       {
         title: "Sleep PC",
         actionId: "sleep",
         parameters: {},
-        searchTerms: ["sleep", "sleep pc", "standby", "suspend"]
+        searchTerms: ["sl", "sleep", "sleep pc", "standby", "suspend"]
       },
       {
         title: "Lock PC",
