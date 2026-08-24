@@ -35,6 +35,9 @@
     "core:event:default",
     "os:default",
     "opener:default",
-    "dialog:default"
+    "dialog:default",
+    "global-shortcut:default",
+    "process:default",
+    "updater:default"
   ]
 }
