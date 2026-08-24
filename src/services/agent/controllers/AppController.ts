@@ -28,7 +28,26 @@ export class AppController {
         const entry = entries.find(e => e.title.toLowerCase() === String(appName).toLowerCase() || e.executableName?.toLowerCase() === String(appName).toLowerCase());
         
         if (!entry) {
+          // Fallback: Try launching via protocol / system command for known or user-typed apps
+          const lower = String(appName).toLowerCase();
+          try {
+            if (lower === "spotify") {
+              await open("spotify:");
+              return;
+            } else if (lower === "discord") {
+              await open("discord:");
+              return;
+            } else if (lower === "steam") {
+              await open("steam://open/main");
+              return;
+            } else {
+              await invoke("launch_game", { pathOrUrl: appName });
+              return;
+            }
+          } catch (fallbackErr) {
+            console.warn(`[AppController] Could not launch "${appName}" directly:`, fallbackErr);
             throw new Error(`Application "${appName}" not found in library.`);
+          }
         }
         
         if (!entry.executablePath) {

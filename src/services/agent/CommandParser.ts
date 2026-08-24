@@ -19,6 +19,7 @@ interface CommandTemplate {
 
 export class CommandParser {
   private websiteAliases: Array<{ alias: string; name: string; url: string }> = [
+    { alias: "spotify", name: "Spotify", url: "spotify:" },
     { alias: "yt", name: "YouTube", url: "https://www.youtube.com" },
     { alias: "youtube", name: "YouTube", url: "https://www.youtube.com" },
     { alias: "dc", name: "Discord", url: "https://discord.com/app" },
@@ -31,7 +32,9 @@ export class CommandParser {
     { alias: "twitch", name: "Twitch", url: "https://www.twitch.tv" },
     { alias: "netflix", name: "Netflix", url: "https://www.netflix.com" },
     { alias: "steam", name: "Steam", url: "steam://open/main" },
-    { alias: "epic", name: "Epic Games", url: "com.epicgames.launcher://" }
+    { alias: "epic", name: "Epic Games", url: "com.epicgames.launcher://" },
+    { alias: "chatgpt", name: "ChatGPT", url: "https://chatgpt.com" },
+    { alias: "google", name: "Google", url: "https://www.google.com" }
   ];
 
   /**
@@ -46,6 +49,27 @@ export class CommandParser {
     // Exact/Regex matchers for dynamic commands (e.g. "volume 50")
     const dynamicResults: ParsedCommand[] = [];
     
+    // 1. Check if input is a URL or domain (e.g. "hello.com", "open reddit.com", "https://xyz.org")
+    const cleanUrlQuery = lowerText.replace(/^(?:open|go\s+to|visit|launch)\s+/i, '').trim();
+    const urlPattern = /^(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}(?:\/[^\s]*)?)$/i;
+    const urlMatch = cleanUrlQuery.match(urlPattern) || lowerText.match(urlPattern);
+
+    if (urlMatch) {
+      const rawUrl = urlMatch[1] || cleanUrlQuery;
+      const fullUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://') 
+        ? rawUrl 
+        : `https://${rawUrl}`;
+      
+      dynamicResults.push({
+        title: `Open ${rawUrl}`,
+        actionId: 'open_website',
+        parameters: { url: fullUrl },
+        originalText: text,
+        score: -1 // Highest priority
+      });
+    }
+
+    // 2. Dynamic volume matcher
     const volMatch = lowerText.match(/^v(?:olume)?\s+(\d+)$/);
     if (volMatch) {
       dynamicResults.push({
@@ -53,7 +77,21 @@ export class CommandParser {
         actionId: 'set_volume',
         parameters: { level: parseInt(volMatch[1], 10) },
         originalText: text,
-        score: 0 // perfect score
+        score: -0.5
+      });
+    }
+
+    // 3. Dynamic "Open <app>" fallback if user types an app name not directly indexed
+    const openAppMatch = lowerText.match(/^(?:open|launch|start)\s+(.+)$/i);
+    if (openAppMatch && !urlMatch) {
+      const targetApp = openAppMatch[1].trim();
+      const capitalized = targetApp.charAt(0).toUpperCase() + targetApp.slice(1);
+      dynamicResults.push({
+        title: `Launch ${capitalized}`,
+        actionId: 'launch_app',
+        parameters: { appName: capitalized },
+        originalText: text,
+        score: 0.1
       });
     }
 

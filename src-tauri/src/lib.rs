@@ -128,17 +128,25 @@ pub fn run() {
                                     if is_visible {
                                         let _ = cmd_win.hide();
                                     } else {
-                                        // Get cursor position and position the window near it
+                                        // Get cursor position and clamp window within screen bounds
                                         #[cfg(target_os = "windows")]
                                         {
                                             use windows::Win32::Foundation::POINT;
-                                            use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+                                            use windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
                                             let mut pt = POINT { x: 0, y: 0 };
-                                            unsafe { let _ = GetCursorPos(&mut pt); }
-                                            // Offset slightly so it doesn't cover the cursor
-                                            let x = pt.x as i32;
-                                            let y = pt.y as i32 - 20;
-                                            let _ = cmd_win.set_position(tauri::PhysicalPosition::new(x, y));
+                                            unsafe { 
+                                                let _ = GetCursorPos(&mut pt); 
+                                                let screen_w = GetSystemMetrics(SM_CXSCREEN);
+                                                let screen_h = GetSystemMetrics(SM_CYSCREEN);
+                                                let win_w = 580;
+                                                let win_h = 350;
+
+                                                // Center horizontally near cursor and position above/at cursor
+                                                let target_x = (pt.x - (win_w / 2)).max(16).min(screen_w - win_w - 16);
+                                                let target_y = (pt.y - 30).max(16).min(screen_h - win_h - 16);
+
+                                                let _ = cmd_win.set_position(tauri::PhysicalPosition::new(target_x, target_y));
+                                            }
                                         }
                                         let _ = cmd_win.show();
                                         let _ = cmd_win.set_always_on_top(true);
