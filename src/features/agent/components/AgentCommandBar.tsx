@@ -25,29 +25,41 @@ interface AgentCommandBarProps {
 }
 
 export const AgentCommandBar: React.FC<AgentCommandBarProps> = ({ embedded, onClose }) => {
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
   const [inputValue, setInputValue] = useState("");
   const [suggestions, setSuggestions] = useState<ParsedCommand[]>([]);
 
   useEffect(() => {
-    setIsVisible(true);
-
     const handleKeyDown = async (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         await hideCommandBar();
       }
     };
 
-    // Also hide when window loses focus (user clicks away)
-    const handleBlur = async () => {
-      await hideCommandBar();
+    window.addEventListener("keydown", handleKeyDown);
+
+    // Delay blur handler so the OS focus handoff doesn't immediately close the window
+    let blurTimer: ReturnType<typeof setTimeout>;
+    const handleBlur = () => {
+      blurTimer = setTimeout(async () => {
+        await hideCommandBar();
+      }, 100);
+    };
+    const handleFocus = () => {
+      clearTimeout(blurTimer);
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("blur", handleBlur);
+    const blurSetupTimer = setTimeout(() => {
+      window.addEventListener("blur", handleBlur);
+      window.addEventListener("focus", handleFocus);
+    }, 300);
+
     return () => {
+      clearTimeout(blurSetupTimer);
+      clearTimeout(blurTimer);
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("focus", handleFocus);
     };
   }, []);
 
