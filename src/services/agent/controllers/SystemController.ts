@@ -3,17 +3,29 @@ import { lockPc, setVolume, muteVolume, takeScreenshot, startRecording, stopReco
 
 export class SystemController {
   init() {
+    const takeScreenshotHandler = async () => {
+      console.log(`[SystemController] Taking screenshot...`);
+      const path = await takeScreenshot();
+      console.log(`[SystemController] Screenshot saved to ${path}`);
+      return path;
+    };
+
+    actionRegistry.register({
+      id: "take_screenshot",
+      name: "Take Screenshot",
+      description: "Capture the current screen.",
+      category: "SYSTEM",
+      parameters: [],
+      handler: takeScreenshotHandler
+    });
+
     actionRegistry.register({
       id: "screenshot",
       name: "Take Screenshot",
       description: "Capture the current screen.",
       category: "SYSTEM",
       parameters: [],
-      handler: async () => {
-        console.log(`[SystemController] Taking screenshot...`);
-        const path = await takeScreenshot();
-        console.log(`[SystemController] Screenshot saved to ${path}`);
-      }
+      handler: takeScreenshotHandler
     });
 
     actionRegistry.register({

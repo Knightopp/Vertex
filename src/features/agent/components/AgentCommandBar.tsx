@@ -112,31 +112,26 @@ export const AgentCommandBar: React.FC<AgentCommandBarProps> = ({ embedded, onCl
   const [executingTitle, setExecutingTitle] = useState<string | null>(null);
 
   const handleSelect = async (command: ParsedCommand) => {
-    if (executingTitle) return;
-    setExecutingTitle(command.title);
+    // Hide the command bar immediately on single click
+    await hideCommandBar();
     
     try {
       await actionExecutor.execute(command.actionId, command.parameters);
     } catch (e) {
       console.error(e);
     }
-
-    setTimeout(async () => {
-      await hideCommandBar();
-      setExecutingTitle(null);
-    }, 250);
   };
 
   return (
-    <div className="w-full h-full p-1.5 bg-transparent select-none flex flex-col">
-      <div className="w-full h-full rounded-2xl border border-white/20 bg-[#0d0d14]/98 backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col ring-1 ring-white/10">
+    <div className="w-full h-full p-2 bg-transparent select-none flex flex-col">
+      <div className="w-full h-full rounded-2xl border border-white/20 bg-[#161622] shadow-2xl overflow-hidden flex flex-col ring-1 ring-white/10">
         <Command 
           shouldFilter={false}
-          className="flex flex-col w-full h-full bg-transparent text-white"
+          className="flex flex-col w-full h-full bg-[#161622] text-white"
         >
           {/* Header Search Input */}
-          <div className="flex items-center px-4 py-2 border-b border-white/10 bg-white/[0.02] shrink-0" style={{ WebkitAppRegion: "drag" } as any}>
-            <div className="p-1.5 rounded-lg bg-purple-500/15 text-purple-400 mr-3 shrink-0">
+          <div className="flex items-center px-4 py-2.5 border-b border-white/10 bg-[#1a1a28] shrink-0" style={{ WebkitAppRegion: "drag" } as any}>
+            <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-400 mr-3 shrink-0">
               <Terminal className="w-4 h-4" />
             </div>
             <input
@@ -150,13 +145,13 @@ export const AgentCommandBar: React.FC<AgentCommandBarProps> = ({ embedded, onCl
                   await handleSelect(displayedCommands[0]);
                 }
               }}
-              className="w-full bg-transparent border-none py-2 text-sm font-medium text-white placeholder:text-white/40 focus:outline-none focus:ring-0"
+              className="w-full bg-transparent border-none py-1.5 text-sm font-medium text-white placeholder:text-white/40 focus:outline-none focus:ring-0"
               style={{ WebkitAppRegion: "no-drag" } as any}
             />
             {inputValue && (
               <button
                 onMouseDown={(e) => { e.preventDefault(); setInputValue(""); }}
-                className="text-xs px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-white/70 transition shrink-0"
+                className="text-xs px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-white/70 transition shrink-0"
                 style={{ WebkitAppRegion: "no-drag" } as any}
               >
                 Clear
@@ -164,18 +159,10 @@ export const AgentCommandBar: React.FC<AgentCommandBarProps> = ({ embedded, onCl
             )}
           </div>
 
-          {/* Execution feedback banner */}
-          {executingTitle && (
-            <div className="px-4 py-2 bg-purple-600/30 border-b border-purple-500/30 text-purple-200 text-xs font-semibold flex items-center gap-2 animate-pulse">
-              <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping" />
-              Executing: {executingTitle}...
-            </div>
-          )}
-
           {/* Action List */}
-          <Command.List className="flex-1 overflow-y-auto p-2 custom-scrollbar" style={{ WebkitAppRegion: "no-drag" } as any}>
-            {!inputValue && !executingTitle && (
-              <div className="px-3 pt-1 pb-1.5 text-[10px] font-bold tracking-wider uppercase text-purple-400/90">
+          <Command.List className="flex-1 overflow-y-auto p-2 custom-scrollbar bg-[#161622]" style={{ WebkitAppRegion: "no-drag" } as any}>
+            {!inputValue && (
+              <div className="px-3 pt-1 pb-1 text-[10px] font-bold tracking-wider uppercase text-purple-400">
                 Suggested Actions
               </div>
             )}
@@ -194,15 +181,15 @@ export const AgentCommandBar: React.FC<AgentCommandBarProps> = ({ embedded, onCl
                   handleSelect(command);
                 }}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2 my-0.5 text-sm text-white/90 rounded-xl cursor-pointer select-none transition-all",
-                  "hover:bg-purple-600/30 hover:text-white active:scale-[0.99] hover:ring-1 hover:ring-purple-500/40"
+                  "flex items-center gap-3 px-3.5 py-2.5 my-1 text-sm text-white/90 rounded-xl cursor-pointer select-none transition-all",
+                  "bg-white/[0.02] hover:bg-purple-600/30 hover:text-white active:scale-[0.98] hover:ring-1 hover:ring-purple-500/50"
                 )}
               >
                 <div className="p-1.5 rounded-lg bg-white/10 text-white/80 shrink-0">
                   {getIconForAction(command.actionId)}
                 </div>
                 <span className="font-medium flex-1 truncate">{command.title}</span>
-                <span className="text-[11px] text-white/35 font-mono px-2 py-0.5 rounded bg-white/5 shrink-0">
+                <span className="text-[11px] text-white/40 font-mono px-2 py-0.5 rounded bg-white/5 shrink-0">
                   Enter ↵
                 </span>
               </div>
