@@ -40,22 +40,22 @@ export class ShortcutController {
             store.setCommandInterfaceOpen(!store.isCommandInterfaceOpen);
             
             try {
-              const commandWindow = await WebviewWindow.getByLabel('agent-command-bar');
-              console.log("[ShortcutController] Got command window:", !!commandWindow);
-              if (commandWindow) {
-                const isVisible = await commandWindow.isVisible();
-                if (isVisible) {
-                  await commandWindow.hide();
-                } else {
-                  await commandWindow.show();
-                  await commandWindow.setFocus();
-                  await commandWindow.setAlwaysOnTop(true);
+              const mainWindow = await WebviewWindow.getByLabel('main');
+              if (mainWindow) {
+                const isVisible = await mainWindow.isVisible();
+                if (!isVisible) {
+                  await mainWindow.show();
                 }
+                await mainWindow.setFocus();
+                
+                // If the store is now false, the user just closed it with the shortcut
+                // If it's true, they just opened it. 
+                // We might want to handle minimizing when closed, but for now just focus.
               } else {
-                console.warn("[ShortcutController] agent-command-bar window not found!");
+                console.warn("[ShortcutController] main window not found!");
               }
             } catch (e) {
-              console.error("[ShortcutController] Failed to toggle agent command bar window", e);
+              console.error("[ShortcutController] Failed to toggle main window", e);
             }
           }
         });
