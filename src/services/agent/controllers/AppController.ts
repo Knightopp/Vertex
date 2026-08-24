@@ -28,17 +28,28 @@ export class AppController {
         const entry = entries.find(e => e.title.toLowerCase() === String(appName).toLowerCase() || e.executableName?.toLowerCase() === String(appName).toLowerCase());
         
         if (!entry) {
-          // Fallback: Try launching via protocol / system command for known or user-typed apps
-          const lower = String(appName).toLowerCase();
+          const lower = String(appName).toLowerCase().trim();
           try {
             if (lower === "spotify") {
-              await open("spotify:");
+              await invoke("launch_game", { pathOrUrl: "spotify:" });
               return;
             } else if (lower === "discord") {
-              await open("discord:");
+              await invoke("launch_game", { pathOrUrl: "discord:" });
               return;
             } else if (lower === "steam") {
-              await open("steam://open/main");
+              await invoke("launch_game", { pathOrUrl: "steam://open/main" });
+              return;
+            } else if (lower === "epic" || lower === "epic games") {
+              await invoke("launch_game", { pathOrUrl: "com.epicgames.launcher://" });
+              return;
+            } else if (lower === "calc" || lower === "calculator") {
+              await invoke("launch_game", { pathOrUrl: "calc" });
+              return;
+            } else if (lower === "notepad") {
+              await invoke("launch_game", { pathOrUrl: "notepad" });
+              return;
+            } else if (lower === "chrome" || lower === "google chrome") {
+              await invoke("launch_game", { pathOrUrl: "chrome" });
               return;
             } else {
               await invoke("launch_game", { pathOrUrl: appName });
@@ -147,12 +158,12 @@ export class AppController {
         }
       ],
       handler: async (params) => {
-        let url = params.url;
-        if (!url.includes("://")) {
-            url = `https://${url}`;
+        let url = String(params.url).trim();
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+          url = `https://${url}`;
         }
         console.log(`[AppController] Opening website: ${url}`);
-        await open(url);
+        await invoke("launch_game", { pathOrUrl: url });
       }
     });
 

@@ -82,6 +82,24 @@ export const AgentCommandBar: React.FC<AgentCommandBarProps> = ({ embedded, onCl
       parameters: {},
     },
     {
+      actionId: "launch_app",
+      title: "Open Spotify",
+      confidence: 1,
+      parameters: { appName: "Spotify" },
+    },
+    {
+      actionId: "launch_app",
+      title: "Open Steam",
+      confidence: 1,
+      parameters: { appName: "Steam" },
+    },
+    {
+      actionId: "open_website",
+      title: "Open YouTube",
+      confidence: 1,
+      parameters: { url: "https://www.youtube.com" },
+    },
+    {
       actionId: "mute",
       title: "Toggle Mute",
       confidence: 1,
@@ -92,18 +110,6 @@ export const AgentCommandBar: React.FC<AgentCommandBarProps> = ({ embedded, onCl
       title: "Lock PC",
       confidence: 1,
       parameters: {},
-    },
-    {
-      actionId: "open_website",
-      title: "Open YouTube",
-      confidence: 1,
-      parameters: { url: "https://www.youtube.com" },
-    },
-    {
-      actionId: "launch_app",
-      title: "Open Steam",
-      confidence: 1,
-      parameters: { appName: "Steam" },
     },
   ];
 

@@ -18,12 +18,20 @@ interface CommandTemplate {
 }
 
 export class CommandParser {
+  private commonApps = [
+    { name: "Spotify", searchTerms: ["spotify", "open spotify", "play spotify", "music", "songs"] },
+    { name: "Discord", searchTerms: ["discord", "open discord", "dc", "chat"] },
+    { name: "Steam", searchTerms: ["steam", "open steam", "valve"] },
+    { name: "Epic Games", searchTerms: ["epic", "epic games", "open epic"] },
+    { name: "Visual Studio Code", searchTerms: ["vscode", "vs code", "code", "open code"] },
+    { name: "Chrome", searchTerms: ["chrome", "google chrome", "browser", "open chrome"] },
+    { name: "Notepad", searchTerms: ["notepad", "notes", "open notepad"] },
+    { name: "Calculator", searchTerms: ["calc", "calculator", "open calc"] },
+  ];
+
   private websiteAliases: Array<{ alias: string; name: string; url: string }> = [
-    { alias: "spotify", name: "Spotify", url: "spotify:" },
-    { alias: "yt", name: "YouTube", url: "https://www.youtube.com" },
     { alias: "youtube", name: "YouTube", url: "https://www.youtube.com" },
-    { alias: "dc", name: "Discord", url: "https://discord.com/app" },
-    { alias: "discord", name: "Discord", url: "https://discord.com/app" },
+    { alias: "yt", name: "YouTube", url: "https://www.youtube.com" },
     { alias: "github", name: "GitHub", url: "https://github.com" },
     { alias: "gh", name: "GitHub", url: "https://github.com" },
     { alias: "reddit", name: "Reddit", url: "https://www.reddit.com" },
@@ -31,8 +39,6 @@ export class CommandParser {
     { alias: "x", name: "X", url: "https://x.com" },
     { alias: "twitch", name: "Twitch", url: "https://www.twitch.tv" },
     { alias: "netflix", name: "Netflix", url: "https://www.netflix.com" },
-    { alias: "steam", name: "Steam", url: "steam://open/main" },
-    { alias: "epic", name: "Epic Games", url: "com.epicgames.launcher://" },
     { alias: "chatgpt", name: "ChatGPT", url: "https://chatgpt.com" },
     { alias: "google", name: "Google", url: "https://www.google.com" }
   ];
@@ -46,26 +52,26 @@ export class CommandParser {
 
     const templates = this.buildCorpus();
     
-    // Exact/Regex matchers for dynamic commands (e.g. "volume 50")
+    // Exact/Regex matchers for dynamic commands
     const dynamicResults: ParsedCommand[] = [];
     
-    // 1. Check if input is a URL or domain (e.g. "hello.com", "open reddit.com", "https://xyz.org")
+    // 1. Custom URL or domain (e.g. "hello.com", "open reddit.com/r/gaming", "https://xyz.org")
     const cleanUrlQuery = lowerText.replace(/^(?:open|go\s+to|visit|launch)\s+/i, '').trim();
     const urlPattern = /^(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}(?:\/[^\s]*)?)$/i;
-    const urlMatch = cleanUrlQuery.match(urlPattern) || lowerText.match(urlPattern);
+    const urlMatch = cleanUrlQuery.match(urlPattern);
 
     if (urlMatch) {
-      const rawUrl = urlMatch[1] || cleanUrlQuery;
-      const fullUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://') 
-        ? rawUrl 
-        : `https://${rawUrl}`;
+      const rawDomain = urlMatch[1];
+      const targetUrl = cleanUrlQuery.startsWith('http://') || cleanUrlQuery.startsWith('https://') 
+        ? cleanUrlQuery 
+        : `https://${rawDomain}`;
       
       dynamicResults.push({
-        title: `Open ${rawUrl}`,
+        title: `Open ${rawDomain}`,
         actionId: 'open_website',
-        parameters: { url: fullUrl },
+        parameters: { url: targetUrl },
         originalText: text,
-        score: -1 // Highest priority
+        score: -1 // Top priority
       });
     }
 
@@ -81,7 +87,7 @@ export class CommandParser {
       });
     }
 
-    // 3. Dynamic "Open <app>" fallback if user types an app name not directly indexed
+    // 3. Dynamic "Open <app>" fallback if user types an app name
     const openAppMatch = lowerText.match(/^(?:open|launch|start)\s+(.+)$/i);
     if (openAppMatch && !urlMatch) {
       const targetApp = openAppMatch[1].trim();
@@ -95,7 +101,7 @@ export class CommandParser {
       });
     }
 
-    // Setup Fuse.js for fuzzy matching
+    // Setup Fuse.js for fuzzy matching against library, presets, common apps, and system actions
     const fuse = new Fuse(templates, {
       keys: ['searchTerms'],
       threshold: 0.4,
@@ -116,13 +122,13 @@ export class CommandParser {
     const combined = [...dynamicResults, ...fuzzyResults];
     combined.sort((a, b) => (a.score || 0) - (b.score || 0));
 
-    return combined.slice(0, 10); // Return top 10 suggestions
+    return combined.slice(0, 10);
   }
 
   private buildCorpus(): CommandTemplate[] {
     const templates: CommandTemplate[] = [];
 
-    // 1. Library Apps
+    // 1. Library Apps & Games from Vertex
     const apps = libraryManager.getEntries();
     for (const app of apps) {
       templates.push({
@@ -137,15 +143,19 @@ export class CommandParser {
         parameters: { appName: app.title, entryId: app.id },
         searchTerms: [`close ${app.title}`, `kill ${app.title}`, `quit ${app.title}`]
       });
+    }
+
+    // 2. Common Desktop Applications (Spotify, Discord, VS Code, etc.)
+    for (const app of this.commonApps) {
       templates.push({
-        title: `Force Close ${app.title}`,
-        actionId: 'force_close_app',
-        parameters: { appName: app.title, entryId: app.id },
-        searchTerms: [`force close ${app.title}`, `force quit ${app.title}`]
+        title: `Open ${app.name}`,
+        actionId: 'launch_app',
+        parameters: { appName: app.name },
+        searchTerms: app.searchTerms
       });
     }
 
-    // 2. Presets
+    // 3. Presets
     const presets = usePresetStore.getState().presets;
     for (const preset of presets) {
       templates.push({
@@ -154,15 +164,9 @@ export class CommandParser {
         parameters: { presetName: preset.name },
         searchTerms: [`start ${preset.name}`, `preset ${preset.name}`, preset.name]
       });
-      templates.push({
-        title: `Stop ${preset.name} Preset`,
-        actionId: 'stop_preset',
-        parameters: { presetName: preset.name },
-        searchTerms: [`stop ${preset.name}`, `end ${preset.name}`]
-      });
     }
 
-    // 3. Websites / Aliases
+    // 4. Websites
     for (const site of this.websiteAliases) {
       templates.push({
         title: `Open ${site.name}`,
@@ -172,13 +176,25 @@ export class CommandParser {
       });
     }
 
-    // 4. System / Static Commands
+    // 5. System / Static Commands
     templates.push(
       {
         title: "Take Screenshot",
-        actionId: "screenshot",
+        actionId: "take_screenshot",
         parameters: {},
-        searchTerms: ["screenshot", "take screenshot", "capture screen", "prtscr"]
+        searchTerms: ["screenshot", "take screenshot", "capture screen", "prtscr", "snip"]
+      },
+      {
+        title: "Toggle Mute",
+        actionId: "mute",
+        parameters: {},
+        searchTerms: ["mute", "silence", "quiet", "toggle mute", "sound", "volume"]
+      },
+      {
+        title: "Lock PC",
+        actionId: "lock_pc",
+        parameters: {},
+        searchTerms: ["lock pc", "lock computer", "lock screen", "sleep"]
       },
       {
         title: "Start Recording",
@@ -191,24 +207,6 @@ export class CommandParser {
         actionId: "stop_recording",
         parameters: {},
         searchTerms: ["stop recording", "end recording", "save video"]
-      },
-      {
-        title: "Mute System Volume",
-        actionId: "mute",
-        parameters: {},
-        searchTerms: ["mute", "silence", "quiet", "mute volume"]
-      },
-      {
-        title: "Lock PC",
-        actionId: "lock_pc",
-        parameters: {},
-        searchTerms: ["lock pc", "lock computer", "lock screen", "sleep"]
-      },
-      {
-        title: "Open Vertex Dashboard",
-        actionId: "open_vertex",
-        parameters: {},
-        searchTerms: ["open vertex", "vertex", "dashboard", "home"]
       }
     );
 
