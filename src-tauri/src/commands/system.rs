@@ -8,6 +8,7 @@ pub fn get_idle_duration_ms() -> u64 {
     #[cfg(target_os = "windows")]
     {
         use std::mem;
+        use tauri::Manager;
 
         #[repr(C)]
         struct LastInputInfo {
@@ -101,5 +102,202 @@ pub fn launch_game(path_or_url: String) -> Result<(), String> {
     #[cfg(not(target_os = "windows"))]
     {
         Err("Game launching only supported on Windows".into())
+    }
+}
+
+#[tauri::command]
+pub fn lock_pc() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        unsafe {
+            let _ = windows::Win32::System::Shutdown::LockWorkStation();
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Not implemented on this OS".into())
+    }
+}
+
+#[tauri::command]
+pub fn set_volume(level: f32) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
+        use windows::Win32::Media::Audio::{eMultimedia, eRender, IMMDeviceEnumerator, MMDeviceEnumerator};
+        use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED};
+        
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+            let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+                .map_err(|e| format!("COM error: {}", e))?;
+            let device = enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia)
+                .map_err(|e| format!("Failed to get device: {}", e))?;
+            let volume: IAudioEndpointVolume = device.Activate(CLSCTX_ALL, None)
+                .map_err(|e| format!("Failed to get volume interface: {}", e))?;
+            
+            let bounded_level = level.clamp(0.0, 100.0) / 100.0;
+            volume.SetMasterVolumeLevelScalar(bounded_level, std::ptr::null())
+                .map_err(|e| format!("Failed to set volume: {}", e))?;
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Not implemented on this OS".into())
+    }
+}
+
+#[tauri::command]
+pub fn mute_volume() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
+        use windows::Win32::Media::Audio::{eMultimedia, eRender, IMMDeviceEnumerator, MMDeviceEnumerator};
+        use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED};
+        
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+            let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+                .map_err(|e| format!("COM error: {}", e))?;
+            let device = enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia)
+                .map_err(|e| format!("Failed to get device: {}", e))?;
+            let volume: IAudioEndpointVolume = device.Activate(CLSCTX_ALL, None)
+                .map_err(|e| format!("Failed to get volume interface: {}", e))?;
+            
+            volume.SetMute(true, std::ptr::null())
+                .map_err(|e| format!("Failed to mute: {}", e))?;
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Not implemented on this OS".into())
+    }
+}
+
+#[tauri::command]
+pub fn take_screenshot(app_handle: tauri::AppHandle) -> Result<String, String> {
+    use tauri::Manager;
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::Graphics::Gdi::{
+            BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, GetDC, SelectObject,
+            SRCCOPY, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, GetDIBits
+        };
+        use windows::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
+        use std::path::PathBuf;
+        use chrono::Local;
+
+        unsafe {
+            let w = GetSystemMetrics(SM_CXSCREEN);
+            let h = GetSystemMetrics(SM_CYSCREEN);
+            
+            let hdc_screen = GetDC(None);
+            let hdc_mem = CreateCompatibleDC(hdc_screen);
+            let hbm = CreateCompatibleBitmap(hdc_screen, w, h);
+            
+            SelectObject(hdc_mem, hbm);
+            BitBlt(hdc_mem, 0, 0, w, h, hdc_screen, 0, 0, SRCCOPY)
+                .map_err(|e| format!("BitBlt failed: {}", e))?;
+                
+            let mut bmi = BITMAPINFO {
+                bmiHeader: BITMAPINFOHEADER {
+                    biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                    biWidth: w,
+                    biHeight: -h,
+                    biPlanes: 1,
+                    biBitCount: 32,
+                    biCompression: BI_RGB.0,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            
+            let mut pixels: Vec<u8> = vec![0; (w * h * 4) as usize];
+            GetDIBits(hdc_screen, hbm, 0, h as u32, Some(pixels.as_mut_ptr() as *mut _), &mut bmi, DIB_RGB_COLORS);
+
+            // Convert BGRA to RGBA
+            for chunk in pixels.chunks_exact_mut(4) {
+                chunk.swap(0, 2);
+            }
+
+            let mut img = image::RgbaImage::from_raw(w as u32, h as u32, pixels)
+                .ok_or("Failed to create image buffer")?;
+                
+            let timestamp = Local::now().format("%Y%m%d_%H%M%S").to_string();
+            let app_dir = app_handle.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+            let screenshots_dir = app_dir.join("Screenshots");
+            std::fs::create_dir_all(&screenshots_dir).map_err(|e| e.to_string())?;
+            
+            let filepath = screenshots_dir.join(format!("Screenshot_{}.png", timestamp));
+            img.save(&filepath).map_err(|e| format!("Failed to save: {}", e))?;
+            
+            Ok(filepath.to_string_lossy().into_owned())
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Not implemented on this OS".into())
+    }
+}
+
+use std::sync::Mutex;
+use std::process::{Child, Command as ProcessCommand};
+
+lazy_static::lazy_static! {
+    static ref FF_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
+}
+
+#[tauri::command]
+pub fn start_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
+    use tauri::Manager;
+    let mut proc = FF_PROCESS.lock().unwrap();
+    if proc.is_some() {
+        return Err("Recording already in progress".into());
+    }
+
+    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
+    let app_dir = app_handle.path().app_data_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let recordings_dir = app_dir.join("Recordings");
+    std::fs::create_dir_all(&recordings_dir).map_err(|e| e.to_string())?;
+    
+    let filepath = recordings_dir.join(format!("Record_{}.mp4", timestamp));
+    
+    // Attempt to spawn ffmpeg using gdigrab
+    let child = ProcessCommand::new("ffmpeg")
+        .args(&[
+            "-f", "gdigrab",
+            "-framerate", "30",
+            "-i", "desktop",
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-pix_fmt", "yuv420p",
+            filepath.to_str().unwrap()
+        ])
+        .spawn()
+        .map_err(|e| format!("Failed to spawn ffmpeg (ensure it is in PATH): {}", e))?;
+        
+    *proc = Some(child);
+    Ok(filepath.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+pub fn stop_recording() -> Result<(), String> {
+    let mut proc = FF_PROCESS.lock().unwrap();
+    if let Some(mut child) = proc.take() {
+        #[cfg(target_os = "windows")]
+        {
+            // FFmpeg needs 'q' or graceful SIGINT to finish encoding headers.
+            // A simple kill corrupts mp4. Using taskkill to send close signal to ffmpeg window/console.
+            let _ = ProcessCommand::new("taskkill")
+                .args(&["/PID", &child.id().to_string()])
+                .status();
+        }
+        let _ = child.wait();
+        Ok(())
+    } else {
+        Err("No active recording".into())
     }
 }

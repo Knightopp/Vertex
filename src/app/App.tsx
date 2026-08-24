@@ -15,6 +15,8 @@ import Settings from "@/pages/Settings";
 import Wishlist from "@/pages/Wishlist";
 import NotFound from "@/pages/NotFound";
 import OAuthRedirect from "@/pages/OAuthRedirect";
+import AgentOverlay from "@/features/agent/components/AgentOverlay";
+import AgentCommandBar from "@/features/agent/components/AgentCommandBar";
 import { UpdateManager } from "@/components/layout/UpdateManager";
 import { WhatsNewModal } from "@/components/layout/WhatsNewModal";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -22,6 +24,7 @@ import { processManager } from "@/services/ProcessManager";
 import { sessionManager } from "@/services/SessionManager";
 import { syncManager } from "@/services/SyncManager";
 import { libraryManager } from "@/services/LibraryManager";
+import { agentCore } from "@/services/agent/AgentCore";
 
 import React, { useEffect } from "react";
 import { useAuthStore } from "@/stores/auth-store";
@@ -123,6 +126,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
       // Only run process polling on PC
       if (type() !== "android" && type() !== "ios") {
         processManager.startPolling();
+        agentCore.init().catch(console.error);
       }
     }
   }, [session, profile?.setup_complete]);
@@ -171,6 +175,8 @@ const App = () => (
             <Route path="/settings" element={<Settings />} />
             <Route path="/library" element={<Collections />} />
             <Route path="/auth/redirect" element={<OAuthRedirect />} />
+            <Route path="/agent-overlay" element={<AgentOverlay />} />
+            <Route path="/agent-command-bar" element={<AgentCommandBar />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

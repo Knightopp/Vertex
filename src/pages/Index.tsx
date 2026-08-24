@@ -15,6 +15,7 @@ import { NavLink } from "react-router-dom";
 import { ArrowRight, Play, Clock } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import { useTrackingStore } from "@/stores/tracking-store";
+import AgentActivity from "@/features/agent/components/AgentActivity";
 
 const formatSessionTime = (seconds: number) => {
   if (!seconds) return "00:00:00";
@@ -283,6 +284,8 @@ export default function Index() {
                 </div>
               </section>
             )}
+
+            <AgentActivity />
 
             <section>
               <SectionHeading title="Trending Now" showFilter />

@@ -76,6 +76,34 @@ export async function getActiveWindow(): Promise<ActiveWindow | null> {
   return invokeCommand<ActiveWindow>("get_active_window");
 }
 
+export async function focusWindow(pid: number): Promise<void> {
+  await invokeCommand("focus_window", { pid });
+}
+
+export async function minimizeWindow(pid: number): Promise<void> {
+  await invokeCommand("minimize_window", { pid });
+}
+
+export async function maximizeWindow(pid: number): Promise<void> {
+  await invokeCommand("maximize_window", { pid });
+}
+
+export async function restoreWindow(pid: number): Promise<void> {
+  await invokeCommand("restore_window", { pid });
+}
+
+export async function moveWindow(pid: number, x: number, y: number, width: number, height: number): Promise<void> {
+  await invokeCommand("move_window", { pid, x, y, width, height });
+}
+
+export async function closeWindow(pid: number): Promise<void> {
+  await invokeCommand("close_window", { pid });
+}
+
+export async function forceCloseProcess(pid: number): Promise<void> {
+  await invokeCommand("force_close_process", { pid });
+}
+
 // ─────────────────────────────────────────────
 // System Commands
 // ─────────────────────────────────────────────
@@ -84,4 +112,28 @@ export async function getActiveWindow(): Promise<ActiveWindow | null> {
 export async function getIdleDurationMs(): Promise<number> {
   const result = await invokeCommand<number>("get_idle_duration_ms");
   return result ?? 0;
+}
+
+export async function lockPc(): Promise<void> {
+  await invokeCommand("lock_pc");
+}
+
+export async function setVolume(level: number): Promise<void> {
+  await invokeCommand("set_volume", { level });
+}
+
+export async function muteVolume(): Promise<void> {
+  await invokeCommand("mute_volume");
+}
+
+export async function takeScreenshot(): Promise<string | null> {
+  return invokeCommand<string>("take_screenshot");
+}
+
+export async function startRecording(): Promise<string | null> {
+  return invokeCommand<string>("start_recording");
+}
+
+export async function stopRecording(): Promise<void> {
+  await invokeCommand("stop_recording");
 }

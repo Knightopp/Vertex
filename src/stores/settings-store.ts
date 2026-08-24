@@ -18,6 +18,7 @@ export const useSettingsStore = create<SettingsState>()((set) => ({
   settings: settingsManager.getSettings(),
   isLoading: true,
   error: null,
+  tutorialCompleted: false,
 
   initialize: async () => {
     try {

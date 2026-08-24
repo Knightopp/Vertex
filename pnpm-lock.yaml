@@ -35,6 +35,9 @@ importers:
       '@tauri-apps/plugin-dialog':
         specifier: ^2.2.0
         version: 2.7.1
+      '@tauri-apps/plugin-global-shortcut':
+        specifier: ~2.3.2
+        version: 2.3.2
       '@tauri-apps/plugin-http':
         specifier: ~2.5.9
         version: 2.5.9
@@ -56,6 +59,9 @@ importers:
       '@tauri-apps/plugin-updater':
         specifier: ^2.10.1
         version: 2.10.1
+      fuse.js:
+        specifier: ^7.5.0
+        version: 7.5.0
     devDependencies:
       '@hookform/resolvers':
         specifier: ^5.2.1
@@ -1583,6 +1589,9 @@ packages:
   '@tauri-apps/plugin-dialog@2.7.1':
     resolution: {integrity: sha512-OK1UBXYt+ojcmxMktzzuyonYIFta8CmAASpX+CA+DTGK24KlHjhYI6x2iOJ/TjZF4N7/ACK1oFmEOjIY9IhzOQ==}
 
+  '@tauri-apps/plugin-global-shortcut@2.3.2':
+    resolution: {integrity: sha512-UReHNXrLvpEjylE4jb4oCYiy96uRykPUthoCQCmRXYrd5hs5X9DrW+qOn7GLW57EJN4tdK8bgK5twBTz2NOxzA==}
+
   '@tauri-apps/plugin-http@2.5.9':
     resolution: {integrity: sha512-lCiY0+vs4HvIUSvZrBs8TC3TiCB0MOPRmiUjTq4prW7SlcJE2jdLeT6KBsJrT9Tlplufl7W1pY6SFAO3gCWxDA==}
 
@@ -2023,6 +2032,10 @@ packages:
 
   function-bind@1.1.2:
     resolution: {integrity: sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA==}
+
+  fuse.js@7.5.0:
+    resolution: {integrity: sha512-sQtrEfA+ez/3G0cCZecF70oqpCRttCexYUG4mUrtWL49ULUzUyxokt5kyqwtKzj1270RaKih+hcP3qLcumccow==}
+    engines: {node: '>=10'}
 
   generate-function@2.3.1:
     resolution: {integrity: sha512-eeB5GfMNeevm/GRYq20ShmsaGcmI81kIX2K9XQx5miC8KdHaC6Jm0qQ8ZNeGOi7wYB8OsdxKs+Y2oVuTFuVwKQ==}
@@ -3985,6 +3998,10 @@ snapshots:
     dependencies:
       '@tauri-apps/api': 2.11.1
 
+  '@tauri-apps/plugin-global-shortcut@2.3.2':
+    dependencies:
+      '@tauri-apps/api': 2.11.1
+
   '@tauri-apps/plugin-http@2.5.9':
     dependencies:
       '@tauri-apps/api': 2.11.1
@@ -4423,6 +4440,8 @@ snapshots:
     optional: true
 
   function-bind@1.1.2: {}
+
+  fuse.js@7.5.0: {}
 
   generate-function@2.3.1:
     dependencies:

@@ -13,12 +13,13 @@ import { useAppStore } from "@/stores/app-store";
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect } from "react";
 import { discordPresenceManager } from "@/services/DiscordPresenceManager";
+import PresetEditor from "@/features/presets/components/PresetEditor";
 
 export default function Settings() {
   const { settings, updateSettings, isLoading } = useSettingsStore();
   const { checkForUpdates, isCheckingUpdate, updateAvailable } = useAppStore();
   const [appVersion, setAppVersion] = useState("1.0.0");
-  const [activeTab, setActiveTab] = useState<"general" | "library" | "metadata" | "integrations">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "library" | "metadata" | "integrations" | "presets">("general");
   const [newScanPath, setNewScanPath] = useState("");
   const [isSyncingSteam, setIsSyncingSteam] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
@@ -178,6 +179,16 @@ export default function Settings() {
           </button>
           
           <button 
+            onClick={() => setActiveTab("presets")}
+            className={cn(
+              "whitespace-nowrap text-left px-4 py-3 rounded-xl font-bold transition-all",
+              activeTab === "presets" ? "bg-white text-black shadow-lg shadow-white/10" : "text-white/60 hover:bg-white/5 hover:text-white"
+            )}
+          >
+            Workflows & Presets
+          </button>
+          
+          <button 
             onClick={() => setActiveTab("library")}
             className={cn(
               "whitespace-nowrap text-left px-4 py-3 rounded-xl font-bold transition-all",
@@ -264,6 +275,23 @@ export default function Settings() {
                       <span className={cn("absolute inline-block h-5 w-5 transform rounded-full transition-transform duration-200 ease-in-out", settings.discordRichPresence ? "translate-x-8 bg-black" : "translate-x-1 bg-white/50")} />
                     </div>
                   </label>
+
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-black/20 border border-white/5">
+                    <div>
+                      <h4 className="font-bold text-white text-lg">Agent Global Shortcut</h4>
+                      <p className="text-white/50 text-sm">Shortcut to instantly open the Vertex Agent Command Bar from anywhere.</p>
+                    </div>
+                    <div className="flex flex-col">
+                      <input 
+                        type="text"
+                        value={settings.agentGlobalShortcut || ""}
+                        onChange={(e) => updateSettings({ agentGlobalShortcut: e.target.value })}
+                        placeholder="e.g. CommandOrControl+Shift+Space"
+                        className="w-64 px-4 py-2 rounded-xl bg-black/40 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:border-white/50 text-sm"
+                      />
+                      <p className="text-[10px] text-white/30 mt-1 ml-1">Example: CommandOrControl+Alt+Space</p>
+                    </div>
+                  </div>
                 </div>
               </section>
 
@@ -289,6 +317,11 @@ export default function Settings() {
                 </div>
               </section>
             </motion.div>
+          )}
+
+          {/* PRESETS TAB */}
+          {activeTab === "presets" && (
+            <PresetEditor />
           )}
 
           {/* LIBRARY TAB */}

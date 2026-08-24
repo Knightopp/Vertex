@@ -11,6 +11,10 @@ export type AppSettings = {
   pinnedGamesOrder: string[];
   favoriteGamesOrder: string[];
   tutorialCompleted: boolean;
+  agentEnabled: boolean;
+  agentGlobalShortcut: string;
+  agentScreenshotDir: string;
+  agentRecordingDir: string;
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -24,6 +28,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   pinnedGamesOrder: [],
   favoriteGamesOrder: [],
   tutorialCompleted: false,
+  agentEnabled: false,
+  agentGlobalShortcut: "CommandOrControl+Shift+Space",
+  agentScreenshotDir: "",
+  agentRecordingDir: "",
 };
 
 import { useAuthStore } from "../stores/auth-store";

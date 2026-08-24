@@ -205,3 +205,153 @@ pub fn get_active_window() -> Option<ActiveWindow> {
         None
     }
 }
+
+#[tauri::command]
+pub fn focus_window(pid: u32) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::{SetForegroundWindow, ShowWindow, SW_RESTORE};
+        use crate::window_enum::get_top_level_processes;
+        let windows = get_top_level_processes();
+        if let Some(w) = windows.into_iter().find(|w| w.pid == pid) {
+            unsafe {
+                let hwnd = windows::Win32::Foundation::HWND(w.hwnd as _);
+                let _ = ShowWindow(hwnd, SW_RESTORE);
+                let _ = SetForegroundWindow(hwnd);
+            }
+            return Ok(());
+        }
+        Err("Window not found".into())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Not implemented".into())
+    }
+}
+
+#[tauri::command]
+pub fn minimize_window(pid: u32) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_MINIMIZE};
+        use crate::window_enum::get_top_level_processes;
+        let windows = get_top_level_processes();
+        if let Some(w) = windows.into_iter().find(|w| w.pid == pid) {
+            unsafe {
+                let hwnd = windows::Win32::Foundation::HWND(w.hwnd as _);
+                let _ = ShowWindow(hwnd, SW_MINIMIZE);
+            }
+            return Ok(());
+        }
+        Err("Window not found".into())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Not implemented".into())
+    }
+}
+
+#[tauri::command]
+pub fn maximize_window(pid: u32) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_MAXIMIZE};
+        use crate::window_enum::get_top_level_processes;
+        let windows = get_top_level_processes();
+        if let Some(w) = windows.into_iter().find(|w| w.pid == pid) {
+            unsafe {
+                let hwnd = windows::Win32::Foundation::HWND(w.hwnd as _);
+                let _ = ShowWindow(hwnd, SW_MAXIMIZE);
+            }
+            return Ok(());
+        }
+        Err("Window not found".into())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Not implemented".into())
+    }
+}
+
+#[tauri::command]
+pub fn restore_window(pid: u32) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_RESTORE};
+        use crate::window_enum::get_top_level_processes;
+        let windows = get_top_level_processes();
+        if let Some(w) = windows.into_iter().find(|w| w.pid == pid) {
+            unsafe {
+                let hwnd = windows::Win32::Foundation::HWND(w.hwnd as _);
+                let _ = ShowWindow(hwnd, SW_RESTORE);
+            }
+            return Ok(());
+        }
+        Err("Window not found".into())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Not implemented".into())
+    }
+}
+
+#[tauri::command]
+pub fn move_window(pid: u32, x: i32, y: i32, width: i32, height: i32) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::MoveWindow;
+        use crate::window_enum::get_top_level_processes;
+        let windows = get_top_level_processes();
+        if let Some(w) = windows.into_iter().find(|w| w.pid == pid) {
+            unsafe {
+                let hwnd = windows::Win32::Foundation::HWND(w.hwnd as _);
+                let _ = MoveWindow(hwnd, x, y, width, height, true);
+            }
+            return Ok(());
+        }
+        Err("Window not found".into())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Not implemented".into())
+    }
+}
+
+#[tauri::command]
+pub fn close_window(pid: u32) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::{PostMessageW, WM_CLOSE};
+        use crate::window_enum::get_top_level_processes;
+        let windows = get_top_level_processes();
+        if let Some(w) = windows.into_iter().find(|w| w.pid == pid) {
+            unsafe {
+                let hwnd = windows::Win32::Foundation::HWND(w.hwnd as _);
+                let _ = PostMessageW(hwnd, WM_CLOSE, windows::Win32::Foundation::WPARAM(0), windows::Win32::Foundation::LPARAM(0));
+            }
+            return Ok(());
+        }
+        Err("Window not found".into())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Not implemented".into())
+    }
+}
+
+#[tauri::command]
+pub fn force_close_process(pid: u32) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+        unsafe {
+            let handle = OpenProcess(PROCESS_TERMINATE, false, pid).map_err(|e| format!("Failed to open process: {}", e))?;
+            TerminateProcess(handle, 1).map_err(|e| format!("Failed to terminate process: {}", e))?;
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Not implemented".into())
+    }
+}

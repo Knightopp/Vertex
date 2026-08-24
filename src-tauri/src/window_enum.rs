@@ -16,6 +16,7 @@ pub struct WindowProcessInfo {
     pub pid: u32,
     pub exe_path: String,
     pub window_title: String,
+    pub hwnd: usize,
 }
 
 pub fn get_top_level_processes() -> Vec<WindowProcessInfo> {
@@ -84,6 +85,7 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
                             pid,
                             exe_path,
                             window_title: title,
+                            hwnd: hwnd.0 as usize,
                         };
 
                         let processes = &mut *(lparam.0 as *mut Vec<WindowProcessInfo>);

@@ -51,6 +51,10 @@ pub fn run() {
                 if let Some(window) = app.get_webview_window("main") {
                     window.hide().unwrap();
                 }
+                if let Some(agent_window) = app.get_webview_window("agent-overlay") {
+                    agent_window.show().unwrap();
+                    agent_window.set_focus().unwrap();
+                }
             }
 
             #[cfg(desktop)]
@@ -117,6 +121,20 @@ pub fn run() {
             get_deep_link,
             commands::discord::update_discord_presence,
             commands::discord::clear_discord_presence,
+            commands::agent::execute_system_action,
+            commands::process::focus_window,
+            commands::process::minimize_window,
+            commands::process::maximize_window,
+            commands::process::close_window,
+            commands::process::force_close_process,
+            commands::process::restore_window,
+            commands::process::move_window,
+            commands::system::lock_pc,
+            commands::system::set_volume,
+            commands::system::mute_volume,
+            commands::system::take_screenshot,
+            commands::system::start_recording,
+            commands::system::stop_recording,
         ]);
 
     #[cfg(desktop)]
@@ -147,6 +165,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .run(tauri::generate_context!())
