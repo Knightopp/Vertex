@@ -121,6 +121,98 @@ pub fn lock_pc() -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn shutdown_pc() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("shutdown")
+            .args(["/s", "/t", "0"])
+            .spawn()
+            .map_err(|e| format!("Failed to shutdown PC: {}", e))?;
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Not implemented on this OS".into())
+    }
+}
+
+#[tauri::command]
+pub fn sleep_pc() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("rundll32.exe")
+            .args(["powrprof.dll,SetSuspendState", "0,1,0"])
+            .spawn()
+            .map_err(|e| format!("Failed to sleep PC: {}", e))?;
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Not implemented on this OS".into())
+    }
+}
+
+#[derive(Debug, serde::Serialize, Clone)]
+pub struct InstalledApp {
+    pub name: String,
+    pub path: String,
+}
+
+#[tauri::command]
+pub fn get_installed_apps() -> Vec<InstalledApp> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut apps = Vec::new();
+        let mut dirs = Vec::new();
+
+        if let Ok(progdata) = std::env::var("ProgramData") {
+            dirs.push(std::path::PathBuf::from(progdata).join("Microsoft\\Windows\\Start Menu\\Programs"));
+        }
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            dirs.push(std::path::PathBuf::from(appdata).join("Microsoft\\Windows\\Start Menu\\Programs"));
+        }
+
+        for dir in dirs {
+            if dir.exists() {
+                scan_lnk_files(&dir, &mut apps);
+            }
+        }
+
+        apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        apps.dedup_by(|a, b| a.name.to_lowercase() == b.name.to_lowercase());
+        apps
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Vec::new()
+    }
+}
+
+fn scan_lnk_files(dir: &std::path::Path, apps: &mut Vec<InstalledApp>) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                scan_lnk_files(&path, apps);
+            } else if let Some(ext) = path.extension() {
+                if ext.to_string_lossy().to_lowercase() == "lnk" {
+                    if let Some(stem) = path.file_stem() {
+                        let name = stem.to_string_lossy().to_string();
+                        let lower = name.to_lowercase();
+                        if !lower.contains("uninstall") && !lower.contains("help") && !lower.contains("readme") {
+                            apps.push(InstalledApp {
+                                name,
+                                path: path.to_string_lossy().to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[tauri::command]
 pub fn set_volume(level: f32) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {

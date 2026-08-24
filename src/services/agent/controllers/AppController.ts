@@ -21,7 +21,14 @@ export class AppController {
         }
       ],
       handler: async (params) => {
-        const { appName } = params;
+        const { appName, path } = params;
+
+        // 0. If direct executable / shortcut path is provided from installed apps scan
+        if (path) {
+          console.log(`[AppController] Launching installed app directly via path: ${path}`);
+          await invoke("launch_game", { pathOrUrl: path });
+          return;
+        }
         
         // 1. Resolve application from Library
         const entries = await libraryManager.getAllEntries();

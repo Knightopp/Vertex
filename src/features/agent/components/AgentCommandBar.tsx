@@ -4,7 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Command } from "cmdk";
 import { actionExecutor } from "@/services/agent/ActionExecutor";
 import { commandParser, ParsedCommand } from "@/services/agent/CommandParser";
-import { Terminal, Globe, Folder, PlayCircle, StopCircle, VolumeX, Lock, MonitorUp } from "lucide-react";
+import { Terminal, Globe, Folder, PlayCircle, StopCircle, VolumeX, Lock, MonitorUp, Power, Moon, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Note: To map generic actionIds to icons
@@ -16,6 +16,9 @@ const getIconForAction = (actionId: string) => {
   if (actionId === 'open_folder') return <Folder className="w-4 h-4" />;
   if (actionId === 'mute') return <VolumeX className="w-4 h-4" />;
   if (actionId === 'lock_pc') return <Lock className="w-4 h-4" />;
+  if (actionId === 'shutdown') return <Power className="w-4 h-4 text-red-400" />;
+  if (actionId === 'sleep') return <Moon className="w-4 h-4 text-blue-400" />;
+  if (actionId === 'close_all_apps') return <XCircle className="w-4 h-4 text-amber-400" />;
   return <Terminal className="w-4 h-4" />;
 };
 

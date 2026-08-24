@@ -118,6 +118,24 @@ export async function lockPc(): Promise<void> {
   await invokeCommand("lock_pc");
 }
 
+export async function shutdownPc(): Promise<void> {
+  await invokeCommand("shutdown_pc");
+}
+
+export async function sleepPc(): Promise<void> {
+  await invokeCommand("sleep_pc");
+}
+
+export interface InstalledApp {
+  name: string;
+  path: string;
+}
+
+export async function getInstalledApps(): Promise<InstalledApp[]> {
+  const result = await invokeCommand<InstalledApp[]>("get_installed_apps");
+  return result ?? [];
+}
+
 export async function setVolume(level: number): Promise<void> {
   await invokeCommand("set_volume", { level });
 }

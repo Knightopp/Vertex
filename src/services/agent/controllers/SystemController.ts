@@ -57,11 +57,56 @@ export class SystemController {
       name: "Lock PC",
       description: "Locks the computer.",
       category: "SYSTEM",
-      requiresConfirmation: true,
       parameters: [],
       handler: async () => {
         console.log(`[SystemController] Locking PC...`);
         await lockPc();
+      }
+    });
+
+    actionRegistry.register({
+      id: "shutdown",
+      name: "Shutdown PC",
+      description: "Turns off the computer.",
+      category: "SYSTEM",
+      parameters: [],
+      handler: async () => {
+        console.log(`[SystemController] Shutting down PC...`);
+        await shutdownPc();
+      }
+    });
+
+    actionRegistry.register({
+      id: "sleep",
+      name: "Sleep PC",
+      description: "Puts the computer into sleep mode.",
+      category: "SYSTEM",
+      parameters: [],
+      handler: async () => {
+        console.log(`[SystemController] Putting PC to sleep...`);
+        await sleepPc();
+      }
+    });
+
+    actionRegistry.register({
+      id: "close_all_apps",
+      name: "Close All Applications",
+      description: "Closes all open user application windows.",
+      category: "SYSTEM",
+      parameters: [],
+      handler: async () => {
+        console.log(`[SystemController] Closing all user application windows...`);
+        const { getRunningProcesses, closeWindow } = await import("../../../lib/tauri-ipc");
+        const running = await getRunningProcesses();
+        for (const proc of running) {
+          // Avoid closing Windows explorer or self
+          const lowerName = proc.name.toLowerCase();
+          if (lowerName !== "explorer.exe" && lowerName !== "vertex.exe" && lowerName !== "vazorism.exe") {
+            try {
+              await closeWindow(proc.pid);
+            } catch (_) {}
+          }
+        }
       }
     });
 

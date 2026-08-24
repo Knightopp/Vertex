@@ -18,6 +18,19 @@ interface CommandTemplate {
 }
 
 export class CommandParser {
+  private installedAppsCache: Array<{ name: string; path: string }> = [];
+
+  constructor() {
+    this.refreshInstalledApps();
+  }
+
+  async refreshInstalledApps() {
+    try {
+      const { getInstalledApps } = await import('../../lib/tauri-ipc');
+      this.installedAppsCache = await getInstalledApps();
+    } catch (_) {}
+  }
+
   private commonApps = [
     { name: "Spotify", searchTerms: ["spotify", "open spotify", "play spotify", "music", "songs"] },
     { name: "Discord", searchTerms: ["discord", "open discord", "dc", "chat"] },
@@ -27,6 +40,8 @@ export class CommandParser {
     { name: "Chrome", searchTerms: ["chrome", "google chrome", "browser", "open chrome"] },
     { name: "Notepad", searchTerms: ["notepad", "notes", "open notepad"] },
     { name: "Calculator", searchTerms: ["calc", "calculator", "open calc"] },
+    { name: "Task Manager", searchTerms: ["taskmgr", "task manager", "tasks"] },
+    { name: "Settings", searchTerms: ["settings", "windows settings", "control panel"] },
   ];
 
   private websiteAliases: Array<{ alias: string; name: string; url: string }> = [
@@ -101,10 +116,10 @@ export class CommandParser {
       });
     }
 
-    // Setup Fuse.js for fuzzy matching against library, presets, common apps, and system actions
+    // Setup Fuse.js for fuzzy matching against library, installed apps, presets, and system actions
     const fuse = new Fuse(templates, {
       keys: ['searchTerms'],
-      threshold: 0.4,
+      threshold: 0.38,
       includeScore: true,
       ignoreLocation: true,
       minMatchCharLength: 2,
@@ -145,7 +160,17 @@ export class CommandParser {
       });
     }
 
-    // 2. Common Desktop Applications (Spotify, Discord, VS Code, etc.)
+    // 2. Installed Windows Applications (Scanned from Start Menu)
+    for (const app of this.installedAppsCache) {
+      templates.push({
+        title: `Open ${app.name}`,
+        actionId: 'launch_app',
+        parameters: { appName: app.name, path: app.path },
+        searchTerms: [`open ${app.name.toLowerCase()}`, `launch ${app.name.toLowerCase()}`, app.name.toLowerCase()]
+      });
+    }
+
+    // 3. Common Desktop Applications
     for (const app of this.commonApps) {
       templates.push({
         title: `Open ${app.name}`,
@@ -155,7 +180,7 @@ export class CommandParser {
       });
     }
 
-    // 3. Presets
+    // 4. Presets
     const presets = usePresetStore.getState().presets;
     for (const preset of presets) {
       templates.push({
@@ -166,7 +191,7 @@ export class CommandParser {
       });
     }
 
-    // 4. Websites
+    // 5. Websites
     for (const site of this.websiteAliases) {
       templates.push({
         title: `Open ${site.name}`,
@@ -176,7 +201,7 @@ export class CommandParser {
       });
     }
 
-    // 5. System / Static Commands
+    // 6. System / Power / Window Commands
     templates.push(
       {
         title: "Take Screenshot",
@@ -185,16 +210,34 @@ export class CommandParser {
         searchTerms: ["screenshot", "take screenshot", "capture screen", "prtscr", "snip"]
       },
       {
-        title: "Toggle Mute",
-        actionId: "mute",
+        title: "Close All Applications",
+        actionId: "close_all_apps",
         parameters: {},
-        searchTerms: ["mute", "silence", "quiet", "toggle mute", "sound", "volume"]
+        searchTerms: ["close all", "close all apps", "kill all", "quit all", "close everything", "exit all"]
+      },
+      {
+        title: "Shutdown PC",
+        actionId: "shutdown",
+        parameters: {},
+        searchTerms: ["shutdown", "shut down", "turn off", "power off", "shutdown pc"]
+      },
+      {
+        title: "Sleep PC",
+        actionId: "sleep",
+        parameters: {},
+        searchTerms: ["sleep", "sleep pc", "standby", "suspend"]
       },
       {
         title: "Lock PC",
         actionId: "lock_pc",
         parameters: {},
-        searchTerms: ["lock pc", "lock computer", "lock screen", "sleep"]
+        searchTerms: ["lock", "lock pc", "lock computer", "lock screen"]
+      },
+      {
+        title: "Toggle Mute",
+        actionId: "mute",
+        parameters: {},
+        searchTerms: ["mute", "silence", "quiet", "toggle mute", "sound", "volume"]
       },
       {
         title: "Start Recording",
