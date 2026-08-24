@@ -177,7 +177,7 @@ const AppContent = () => {
   }, []);
 
   // If this window is the agent command bar, render it directly without auth
-  if (window.location.pathname === "/agent-command-bar") {
+  if (new URLSearchParams(window.location.search).get('w') === 'cmd') {
     return <AgentCommandBar />;
   }
   

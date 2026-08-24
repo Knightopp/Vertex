@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Vertex",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "identifier": "com.vazorism.app",
   "build": {
     "frontendDist": "../dist",
@@ -42,7 +42,7 @@
       {
         "label": "agent-command-bar",
         "title": "Vertex Command Bar",
-        "url": "/agent-command-bar",
+        "url": "/?w=cmd",
         "width": 700,
         "height": 450,
         "resizable": false,
