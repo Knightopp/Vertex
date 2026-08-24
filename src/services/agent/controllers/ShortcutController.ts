@@ -46,11 +46,12 @@ export class ShortcutController {
                 if (!isVisible) {
                   await mainWindow.show();
                 }
+                await mainWindow.setAlwaysOnTop(true);
                 await mainWindow.setFocus();
+                await mainWindow.setAlwaysOnTop(false);
                 
                 // If the store is now false, the user just closed it with the shortcut
-                // If it's true, they just opened it. 
-                // We might want to handle minimizing when closed, but for now just focus.
+                // If it's true, they just opened it.
               } else {
                 console.warn("[ShortcutController] main window not found!");
               }
