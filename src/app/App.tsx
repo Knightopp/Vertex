@@ -175,6 +175,11 @@ const AppContent = () => {
     }).then((fn) => { unlisten = fn; }).catch(console.error);
     return () => { unlisten?.(); };
   }, []);
+
+  // If this window is the agent command bar, render it directly without auth
+  if (window.location.pathname === "/agent-command-bar") {
+    return <AgentCommandBar />;
+  }
   
   return (
     <>
@@ -197,7 +202,6 @@ const AppContent = () => {
                 <Route path="/library" element={<Collections />} />
                 <Route path="/auth/redirect" element={<OAuthRedirect />} />
                 <Route path="/agent-overlay" element={<AgentOverlay />} />
-                <Route path="/agent-command-bar" element={<AgentCommandBar />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
