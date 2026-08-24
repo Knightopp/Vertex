@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
-import { Bell } from "lucide-react";
+import { Bell, Terminal } from "lucide-react";
 import { useState, useEffect } from "react";
 import { libraryManager } from "@/services/LibraryManager";
 import { toast } from "sonner";
@@ -86,6 +86,19 @@ export default function Header() {
 
       {/* Right: Profile & Notifications */}
       <div className="flex shrink-0 items-center justify-end gap-4 sm:gap-6 relative order-2 md:order-3">
+        <button
+          onClick={() => {
+            import('@/stores/agent-store').then(({ useAgentStore }) => {
+              const store = useAgentStore.getState();
+              store.setCommandInterfaceOpen(!store.isCommandInterfaceOpen);
+            });
+          }}
+          className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-full transition-transform hover:scale-105 shadow-lg shadow-blue-500/20 text-sm flex items-center gap-2"
+        >
+          <Terminal className="w-4 h-4" />
+          <span>Agent</span>
+        </button>
+
         <div className="group relative">
           <button
             aria-label="Notifications"

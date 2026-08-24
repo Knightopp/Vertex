@@ -19,7 +19,12 @@ const getIconForAction = (actionId: string) => {
   return <Terminal className="w-4 h-4" />;
 };
 
-export const AgentCommandBar: React.FC = () => {
+interface AgentCommandBarProps {
+  embedded?: boolean;
+  onClose?: () => void;
+}
+
+export const AgentCommandBar: React.FC<AgentCommandBarProps> = ({ embedded, onClose }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [suggestions, setSuggestions] = useState<ParsedCommand[]>([]);
@@ -48,8 +53,12 @@ export const AgentCommandBar: React.FC = () => {
   const hideCommandBar = async () => {
     setIsVisible(false);
     setTimeout(async () => {
-      const win = getCurrentWindow();
-      await win.hide();
+      if (embedded) {
+        onClose?.();
+      } else {
+        const win = getCurrentWindow();
+        await win.hide();
+      }
       // Reset state for next open
       setInputValue("");
       setIsVisible(true);

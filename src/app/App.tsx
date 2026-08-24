@@ -159,33 +159,48 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
 
 import { DiscordPresenceListener } from "@/components/layout/DiscordPresenceListener";
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <UpdateManager />
-      <WhatsNewModal />
-      <Sonner />
-      <AuthGuard>
-        <BrowserRouter>
-          <DiscordPresenceListener />
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/apps" element={<Apps />} />
-            <Route path="/discovery" element={<Discovery />} />
-            <Route path="/stats" element={<Stats />} />
-            <Route path="/wishlist" element={<Wishlist />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/library" element={<Collections />} />
-            <Route path="/auth/redirect" element={<OAuthRedirect />} />
-            <Route path="/agent-overlay" element={<AgentOverlay />} />
-            <Route path="/agent-command-bar" element={<AgentCommandBar />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthGuard>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+import { DiscordPresenceListener } from "@/components/layout/DiscordPresenceListener";
+import { useAgentStore } from "@/stores/agent-store";
 
-createRoot(document.getElementById("root")!).render(<App />);
+const AppContent = () => {
+  const { isCommandInterfaceOpen, setCommandInterfaceOpen } = useAgentStore();
+  
+  return (
+    <>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <UpdateManager />
+          <WhatsNewModal />
+          <Sonner />
+          <AuthGuard>
+            <BrowserRouter>
+              <DiscordPresenceListener />
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/apps" element={<Apps />} />
+                <Route path="/discovery" element={<Discovery />} />
+                <Route path="/stats" element={<Stats />} />
+                <Route path="/wishlist" element={<Wishlist />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/library" element={<Collections />} />
+                <Route path="/auth/redirect" element={<OAuthRedirect />} />
+                <Route path="/agent-overlay" element={<AgentOverlay />} />
+                <Route path="/agent-command-bar" element={<AgentCommandBar />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </AuthGuard>
+        </TooltipProvider>
+      </QueryClientProvider>
+      
+      {isCommandInterfaceOpen && (
+        <div className="fixed inset-0 z-[9999] pointer-events-auto">
+          <AgentCommandBar embedded onClose={() => setCommandInterfaceOpen(false)} />
+        </div>
+      )}
+    </>
+  );
+};
+
+createRoot(document.getElementById("root")!).render(<AppContent />);
