@@ -94,7 +94,7 @@ export class SettingsManager {
       if (data) {
         this.cache = { ...DEFAULT_SETTINGS, ...JSON.parse(data) };
         let modified = false;
-        if (this.cache.agentGlobalShortcut === "CommandOrControl+Shift+Space") {
+        if (this.cache.agentGlobalShortcut === "CommandOrControl+Shift+Space" || this.cache.agentGlobalShortcut === "Ctrl+Alt+Space") {
           this.cache.agentGlobalShortcut = "CommandOrControl+Alt+Space";
           modified = true;
         }

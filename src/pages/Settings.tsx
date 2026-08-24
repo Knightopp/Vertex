@@ -286,10 +286,32 @@ export default function Settings() {
                         type="text"
                         value={settings.agentGlobalShortcut || ""}
                         onChange={(e) => updateSettings({ agentGlobalShortcut: e.target.value })}
-                        placeholder="e.g. CommandOrControl+Shift+Space"
+                        placeholder="e.g. CommandOrControl+Alt+Space"
                         className="w-64 px-4 py-2 rounded-xl bg-black/40 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:border-white/50 text-sm"
                       />
-                      <p className="text-[10px] text-white/30 mt-1 ml-1">Example: CommandOrControl+Alt+Space</p>
+                      <div className="flex gap-2 items-center mt-2">
+                        <p className="text-[10px] text-white/30 ml-1">Example: CommandOrControl+Alt+Space</p>
+                        <button 
+                          onClick={async () => {
+                            try {
+                              const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+                              const win = await WebviewWindow.getByLabel('agent-command-bar');
+                              if (win) {
+                                await win.show();
+                                await win.setFocus();
+                                await win.setAlwaysOnTop(true);
+                              } else {
+                                toast.error("Command bar window not found!");
+                              }
+                            } catch(e: any) {
+                              toast.error(e.toString());
+                            }
+                          }}
+                          className="px-3 py-1 bg-white/10 hover:bg-white/20 text-xs rounded-md text-white transition-colors"
+                        >
+                          Test Window
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

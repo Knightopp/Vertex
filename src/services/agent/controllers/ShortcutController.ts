@@ -35,11 +35,13 @@ export class ShortcutController {
       if (!alreadyRegistered) {
         await register(shortcut, async (event) => {
           if (event.state === "Pressed") {
+            console.log("[ShortcutController] Shortcut Triggered! Trying to open window...");
             const store = useAgentStore.getState();
             store.setCommandInterfaceOpen(!store.isCommandInterfaceOpen);
             
             try {
               const commandWindow = await WebviewWindow.getByLabel('agent-command-bar');
+              console.log("[ShortcutController] Got command window:", !!commandWindow);
               if (commandWindow) {
                 const isVisible = await commandWindow.isVisible();
                 if (isVisible) {
