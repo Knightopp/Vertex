@@ -39,13 +39,18 @@ export class ShortcutController {
             store.setCommandInterfaceOpen(!store.isCommandInterfaceOpen);
             
             try {
-              const commandWindow = new WebviewWindow('agent-command-bar');
-              const isVisible = await commandWindow.isVisible();
-              if (isVisible) {
-                await commandWindow.hide();
+              const commandWindow = await WebviewWindow.getByLabel('agent-command-bar');
+              if (commandWindow) {
+                const isVisible = await commandWindow.isVisible();
+                if (isVisible) {
+                  await commandWindow.hide();
+                } else {
+                  await commandWindow.show();
+                  await commandWindow.setFocus();
+                  await commandWindow.setAlwaysOnTop(true);
+                }
               } else {
-                await commandWindow.show();
-                await commandWindow.setFocus();
+                console.warn("[ShortcutController] agent-command-bar window not found!");
               }
             } catch (e) {
               console.error("[ShortcutController] Failed to toggle agent command bar window", e);
