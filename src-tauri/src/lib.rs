@@ -182,6 +182,7 @@ pub fn run() {
             commands::process::maximize_window,
             commands::process::close_window,
             commands::process::force_close_process,
+            commands::process::kill_by_name,
             commands::process::restore_window,
             commands::process::move_window,
             commands::system::lock_pc,

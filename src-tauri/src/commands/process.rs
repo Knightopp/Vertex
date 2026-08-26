@@ -389,3 +389,34 @@ pub fn force_close_process(pid: u32) -> Result<(), String> {
         Err("Not implemented".into())
     }
 }
+
+/// Kill all processes matching an image name (e.g. "spotify.exe").
+/// Uses `taskkill /F /IM <name>` which works even when the process
+/// has no visible window — the only reliable method for apps like Spotify.
+#[tauri::command]
+pub fn kill_by_name(name: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        // Ensure the name ends with .exe
+        let exe_name = if name.to_lowercase().ends_with(".exe") {
+            name.clone()
+        } else {
+            format!("{}.exe", name)
+        };
+
+        let status = std::process::Command::new("taskkill")
+            .args(["/F", "/IM", &exe_name])
+            .status();
+
+        match status {
+            Ok(s) if s.success() => Ok(()),
+            Ok(_) => Err(format!("taskkill found no process named '{}'", exe_name)),
+            Err(e) => Err(format!("Failed to run taskkill: {}", e)),
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Not implemented".into())
+    }
+}
+

@@ -197,16 +197,68 @@ function findMatchingProcesses(
       ],
       handler: async (params) => {
         const { appName } = params;
+        const lower = String(appName).trim().toLowerCase();
+
+        // Map of known app names → their executable names for direct kill
+        const knownExeMap: Record<string, string[]> = {
+          spotify:     ["spotify"],
+          discord:     ["discord"],
+          steam:       ["steam"],
+          chrome:      ["chrome"],
+          "google chrome": ["chrome"],
+          edge:        ["msedge"],
+          firefox:     ["firefox"],
+          notepad:     ["notepad"],
+          calculator:  ["calculatorapp", "calc"],
+          calc:        ["calculatorapp", "calc"],
+          vlc:         ["vlc"],
+          vscode:      ["code"],
+          code:        ["code"],
+          "visual studio code": ["code"],
+          photos:      ["microsoft.photos"],
+          images:      ["microsoft.photos"],
+          image:       ["microsoft.photos"],
+          pictures:    ["microsoft.photos"],
+          photo:       ["microsoft.photos"],
+          paint:       ["mspaint"],
+          youtube:     ["chrome", "msedge", "firefox"], // browser tabs — close the browser
+        };
+
+        const exeNames = knownExeMap[lower];
+
+        if (exeNames) {
+          // Primary: kill directly by exe name — works even with no visible window
+          const { killByName } = await import("../../../lib/tauri-ipc");
+          let killed = false;
+          for (const exe of exeNames) {
+            try {
+              await killByName(exe);
+              killed = true;
+              console.log(`[AppController] Killed "${exe}.exe" via killByName`);
+              break;
+            } catch (_) {
+              // try next
+            }
+          }
+          if (killed) return;
+        }
+
+        // Fallback: process-list matching for anything else
         const entries = await libraryManager.getAllEntries();
+        const { getRunningProcesses, closeWindow, killByName: killByNameFallback } = await import("../../../lib/tauri-ipc");
         const running = await getRunningProcesses();
-        
         const targets = findMatchingProcesses(appName, running, entries);
-        
+
         if (targets.length === 0) {
+          // Last resort: try killing by the raw appName as an exe name
+          try {
+            await killByNameFallback(lower);
+            return;
+          } catch (_) {}
           throw new Error(`No running application or window matching "${appName}" was found.`);
         }
-        
-        console.log(`[AppController] Safely closing ${targets.length} instance(s) of "${appName}"`);
+
+        console.log(`[AppController] Closing ${targets.length} instance(s) of "${appName}"`);
         for (const target of targets) {
           try {
             await closeWindow(target.pid);

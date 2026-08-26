@@ -104,6 +104,12 @@ export async function forceCloseProcess(pid: number): Promise<void> {
   await invokeCommand("force_close_process", { pid });
 }
 
+/** Kill a process directly by its executable name (e.g. "spotify" or "spotify.exe").
+ *  Uses taskkill /F /IM — works even when the process has no visible window. */
+export async function killByName(name: string): Promise<void> {
+  await invokeCommand("kill_by_name", { name });
+}
+
 // ─────────────────────────────────────────────
 // System Commands
 // ─────────────────────────────────────────────
