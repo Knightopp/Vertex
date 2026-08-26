@@ -95,7 +95,7 @@ export class CommandParser {
         score: -2
       }];
     }
-    if (lowerText === 'close all' || lowerText === 'close all apps' || lowerText === 'kill all' || lowerText === 'quit all' || lowerText === 'close everything') {
+    if (lowerText === 'close all' || lowerText === 'close all apps' || lowerText === 'close all app' || lowerText === 'kill all' || lowerText === 'quit all' || lowerText === 'close everything') {
       return [{
         title: "Close All Applications",
         actionId: "close_all_apps",
@@ -121,7 +121,7 @@ export class CommandParser {
           originalText: text,
           score: -1.6
         });
-      } else if (targetApp === "all" || targetApp === "all apps" || targetApp === "everything") {
+      } else if (targetApp === "all" || targetApp === "all apps" || targetApp === "all app" || targetApp === "everything") {
         dynamicResults.push({
           title: "Close All Applications",
           actionId: "close_all_apps",
@@ -174,13 +174,34 @@ export class CommandParser {
     }
 
     // 3.5 "Show" command for info
-    if (lowerText === "show" || lowerText === "info" || lowerText === "time" || lowerText === "battery" || lowerText === "now playing") {
+    if (lowerText.startsWith("show") || lowerText === "info" || lowerText === "time" || lowerText === "battery" || lowerText === "now playing") {
       dynamicResults.push({
-        title: "Show System Info",
+        title: "Show System Info (All)",
         actionId: 'show_info',
-        parameters: {},
+        parameters: { type: 'all' },
         originalText: text,
         score: -1.2
+      });
+      dynamicResults.push({
+        title: "Show Battery",
+        actionId: 'show_info',
+        parameters: { type: 'battery' },
+        originalText: text,
+        score: -1.1
+      });
+      dynamicResults.push({
+        title: "Show Time",
+        actionId: 'show_info',
+        parameters: { type: 'time' },
+        originalText: text,
+        score: -1.1
+      });
+      dynamicResults.push({
+        title: "Show Now Playing",
+        actionId: 'show_info',
+        parameters: { type: 'music' },
+        originalText: text,
+        score: -1.1
       });
     }
 

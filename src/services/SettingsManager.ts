@@ -92,16 +92,17 @@ export class SettingsManager {
         if (data) localStorage.setItem(key, data);
       }
       if (data) {
-        this.cache = { ...DEFAULT_SETTINGS, ...JSON.parse(data) };
+        const loaded: AppSettings = { ...DEFAULT_SETTINGS, ...JSON.parse(data) };
         let modified = false;
-        if (this.cache.agentGlobalShortcut === "CommandOrControl+Shift+Space" || this.cache.agentGlobalShortcut === "CommandOrControl+Alt+Space") {
-          this.cache.agentGlobalShortcut = "Ctrl+Alt+Space";
+        if (loaded.agentGlobalShortcut === "CommandOrControl+Shift+Space" || loaded.agentGlobalShortcut === "CommandOrControl+Alt+Space") {
+          loaded.agentGlobalShortcut = "Ctrl+Alt+Space";
           modified = true;
         }
-        if (this.cache.agentEnabled === false) {
-          this.cache.agentEnabled = true;
+        if (loaded.agentEnabled === false) {
+          loaded.agentEnabled = true;
           modified = true;
         }
+        this.cache = loaded;
         if (modified) {
           localStorage.setItem(key, JSON.stringify(this.cache));
         }

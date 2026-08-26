@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export default function SetupProfile() {
-  const { session, fetchProfile } = useAuthStore();
+  const { session } = useAuthStore();
   const user = session?.user;
   
   // Default to OAuth provided values if available
@@ -14,57 +14,31 @@ export default function SetupProfile() {
   const defaultAvatar = user?.user_metadata?.avatar_url || "";
 
   const [username, setUsername] = useState(defaultUsername);
-  const [avatarUrl, setAvatarUrl] = useState(defaultAvatar);
+  const avatarUrl = defaultAvatar;
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [usernameError, setUsernameError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Live username validation
+  // Local username validation (no network verification required)
   useEffect(() => {
-    const checkUsername = async () => {
-      setUsernameError("");
-      
-      if (!username) {
-        setUsernameError("Username is required");
-        return;
-      }
-      if (username.length < 3 || username.length > 20) {
-        setUsernameError("Must be between 3 and 20 characters");
-        return;
-      }
-      if (!/^[a-zA-Z0-9_.]+$/.test(username)) {
-        setUsernameError("Only letters, numbers, underscores, and periods allowed");
-        return;
-      }
-
-      setIsCheckingUsername(true);
-      try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("username", username)
-          .maybeSingle();
-
-        if (error) throw error;
-        
-        if (data && data.id !== user?.id) {
-          setUsernameError("Username is already taken");
-        }
-      } catch (err) {
-        console.error("Username check error", err);
-      } finally {
-        setIsCheckingUsername(false);
-      }
-    };
-
-    const timer = setTimeout(checkUsername, 500);
-    return () => clearTimeout(timer);
-  }, [username, user?.id]);
+    setUsernameError("");
+    if (!username) {
+      setUsernameError("Username is required");
+      return;
+    }
+    if (username.length < 2 || username.length > 25) {
+      setUsernameError("Must be between 2 and 25 characters");
+      return;
+    }
+    if (!/^[a-zA-Z0-9_.\s-]+$/.test(username)) {
+      setUsernameError("Only letters, numbers, spaces, underscores, and dashes allowed");
+      return;
+    }
+  }, [username]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -88,54 +62,45 @@ export default function SetupProfile() {
   };
 
   const handleSave = async () => {
-    if (!user) return;
-    if (usernameError || isCheckingUsername || !username) {
+    if (usernameError || !username) {
       toast.error("Please provide a valid username");
       return;
     }
 
     setIsSaving(true);
-    
     try {
       let finalAvatarUrl = avatarUrl;
 
-      // 1. Upload avatar if a new one was selected
-      if (avatarFile) {
-        const fileExt = avatarFile.name.split('.').pop();
-        const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-        const filePath = `${user.id}/${fileName}`;
+      // Upload avatar to Supabase if connected and file provided
+      if (avatarFile && user?.id && navigator.onLine) {
+        try {
+          const fileExt = avatarFile.name.split('.').pop();
+          const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+          const filePath = `${user.id}/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('avatars')
-          .upload(filePath, avatarFile, { upsert: true });
+          const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(filePath, avatarFile, { upsert: true });
 
-        if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage
-          .from('avatars')
-          .getPublicUrl(filePath);
-
-        finalAvatarUrl = publicUrlData.publicUrl;
+          if (!uploadError) {
+            const { data: publicUrlData } = supabase.storage
+              .from('avatars')
+              .getPublicUrl(filePath);
+            finalAvatarUrl = publicUrlData.publicUrl;
+          }
+        } catch (e) {
+          console.warn("Avatar upload skipped/failed:", e);
+        }
       }
 
-      // 2. Insert or update the profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          username,
-          avatar_url: finalAvatarUrl,
-          setup_complete: true,
-          updated_at: new Date().toISOString(),
-        });
+      // Instantly save profile locally & background-sync
+      await useAuthStore.getState().updateProfile({
+        username: username.trim(),
+        avatar_url: finalAvatarUrl,
+        setup_complete: true,
+      });
 
-      if (profileError) throw profileError;
-
-      toast.success("Profile setup complete!");
-      
-      // Force refresh the auth store to pull the new profile
-      await fetchProfile(user.id);
-      
+      toast.success("Profile saved!");
     } catch (err: any) {
       console.error(err);
       toast.error("Failed to save profile: " + err.message);
@@ -207,9 +172,7 @@ export default function SetupProfile() {
                 placeholder="e.g. shadow_hunter"
               />
               <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                {isCheckingUsername ? (
-                  <Loader2 className="h-5 w-5 animate-spin text-white/50" />
-                ) : username && !usernameError ? (
+                {username && !usernameError ? (
                   <Check className="h-5 w-5 text-green-500" />
                 ) : null}
               </div>
@@ -218,13 +181,13 @@ export default function SetupProfile() {
                <p className="mt-2 text-sm text-red-400">{usernameError}</p>
             )}
             {!usernameError && username && (
-              <p className="mt-2 text-sm text-green-400">Username is available!</p>
+              <p className="mt-2 text-sm text-green-400">Valid username!</p>
             )}
           </div>
 
           <button
             onClick={handleSave}
-            disabled={!!usernameError || isCheckingUsername || isSaving || !username}
+            disabled={!!usernameError || isSaving || !username}
             className="w-full rounded-xl bg-white px-4 py-3 font-bold text-black shadow-lg transition-all hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
             {isSaving ? (

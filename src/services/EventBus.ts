@@ -1,8 +1,9 @@
 export type EventMap = {
   // Process detection
-  "game:detected": { entryId: string; processId: number; executablePath: string; isNew: boolean };
-  "app:detected": { entryId: string; processId: number; executablePath: string; isNew: boolean };
+  "game:detected": { entryId: string; processId: number; executablePath: string; isNew?: boolean };
+  "app:detected": { entryId: string; processId: number; executablePath: string; isNew?: boolean };
   "process:terminated": { entryId: string; processId: number };
+  "process:active_window_changed": any;
 
   // Session lifecycle
   "session:started": { sessionId: string; entryId: string; startedAt: Date };
@@ -12,7 +13,7 @@ export type EventMap = {
 
   // Data updates
   "metadata:updated": { entryId: string; source: string };
-  "library:updated": { entryId: string; action: "created" | "updated" | "deleted" };
+  "library:updated": { entryId?: string; action: "created" | "updated" | "deleted" | "sync" };
   "collections:updated": { collectionId: string; action: "created" | "updated" | "deleted" };
   "images:downloaded": { entryId: string; imageType: string; localPath: string };
 

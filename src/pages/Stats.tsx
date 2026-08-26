@@ -93,7 +93,7 @@ export default function Stats() {
       if (entry && entry.type === "game") {
         const sessionDay = new Date(session.startedAt).toISOString().split('T')[0];
         if (sessionDay === todayStr) {
-          liveSecondsToday += session.effectiveSeconds + (session.idleSeconds || 0);
+          liveSecondsToday += session.effectiveSeconds + ((session as any).idleSeconds || 0);
         }
       }
     }

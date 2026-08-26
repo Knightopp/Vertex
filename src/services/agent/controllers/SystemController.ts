@@ -103,43 +103,62 @@ export class SystemController {
       handler: async (params) => {
         const exceptApp = params?.exceptApp ? String(params.exceptApp).toLowerCase().trim() : null;
         console.log(`[SystemController] Closing all user application windows... (Except: ${exceptApp || 'none'})`);
-        const { getRunningProcesses, closeWindow, forceCloseProcess } = await import("../../../lib/tauri-ipc");
+        const { getRunningProcesses, closeWindow, killByName } = await import("../../../lib/tauri-ipc");
 
-        // Processes that must never be touched
+        // Processes that must never be touched, even gracefully
         const SYSTEM_EXCLUSIONS = new Set([
-          "explorer.exe", "vertex.exe", "vazorism.exe",
-          "applicationframehost.exe", "sihost.exe", "dwm.exe",
+          "sihost.exe", "dwm.exe",
           "svchost.exe", "csrss.exe", "winlogon.exe", "lsass.exe",
           "smss.exe", "wininit.exe", "services.exe", "taskhostw.exe",
           "runtimebroker.exe", "searchindexer.exe", "searchhost.exe",
           "startmenuexperiencehost.exe", "shellexperiencehost.exe",
-          "systemsettings.exe", "textinputhost.exe", "ctfmon.exe",
+          "textinputhost.exe", "ctfmon.exe",
           "fontdrvhost.exe", "spoolsv.exe",
         ]);
 
         const isSystem = (name: string) => SYSTEM_EXCLUSIONS.has(name.toLowerCase());
-        const isVertex = (title: string) =>
-          title.toLowerCase().includes("vertex") || title.toLowerCase().includes("vazorism");
+        const isVertex = (name: string, title: string) => {
+          const lower = name.toLowerCase();
+          return lower === "vertex.exe" || lower === "vazorism.exe" || lower === "vertex_test.exe";
+        };
         const isExcepted = (name: string, title: string) => {
           if (!exceptApp) return false;
           return name.toLowerCase().includes(exceptApp) || title.toLowerCase().includes(exceptApp);
         };
 
         // Pass 1: graceful close
-        const running1 = await getRunningProcesses();
-        const targets1 = running1.filter((p) => !isSystem(p.name) && !isVertex(p.windowTitle) && !isExcepted(p.name, p.windowTitle));
-        console.log(`[SystemController] Pass 1: graceful close for ${targets1.length} process(es)...`);
-        await Promise.allSettled(targets1.map((p) => closeWindow(p.pid)));
+        const running = await getRunningProcesses();
+        const targets = running.filter((p) => !isSystem(p.name) && !isVertex(p.name, p.windowTitle) && !isExcepted(p.name, p.windowTitle));
+        
+        console.log(`[SystemController] Pass 1: graceful close for ${targets.length} process(es)...`);
+        await Promise.allSettled(targets.map((p) => closeWindow(p.pid)));
 
-        // Wait 600ms for apps to finish closing (faster UX)
+        // Wait 600ms for apps to finish closing gracefully
         await new Promise((r) => setTimeout(r, 600));
 
-        // Pass 2: force-kill anything still alive
-        const running2 = await getRunningProcesses();
-        const targets2 = running2.filter((p) => !isSystem(p.name) && !isVertex(p.windowTitle) && !isExcepted(p.name, p.windowTitle));
-        if (targets2.length > 0) {
-          console.log(`[SystemController] Pass 2: force-kill ${targets2.length} stubborn process(es)...`);
-          await Promise.allSettled(targets2.map((p) => forceCloseProcess(p.pid)));
+        // Pass 2: force-kill by executable name for ALL original targets.
+        // This ensures apps like Spotify or Discord that hide to the system tray are completely killed.
+        const uniqueNames = Array.from(new Set(targets.map((p) => p.name)));
+        
+        // Add notorious tray apps that might not have a visible window when 'close all' is triggered
+        const NOTORIOUS_TRAY_APPS = [
+          "spotify.exe", "discord.exe", "steam.exe", "msedge.exe", "chrome.exe", 
+          "brave.exe", "whatsapp.exe", "telegram.exe", "slack.exe", "skype.exe"
+        ];
+        
+        for (const trayApp of NOTORIOUS_TRAY_APPS) {
+          if (!uniqueNames.some(n => n.toLowerCase() === trayApp) && !isExcepted(trayApp, trayApp)) {
+            uniqueNames.push(trayApp);
+          }
+        }
+
+        // We must NEVER taskkill these as it can crash the Windows UI
+        const DANGEROUS_FORCE_KILL = new Set(["applicationframehost.exe", "systemsettings.exe", "explorer.exe"]);
+        const safeToKillNames = uniqueNames.filter(n => !DANGEROUS_FORCE_KILL.has(n.toLowerCase()));
+
+        if (safeToKillNames.length > 0) {
+          console.log(`[SystemController] Pass 2: force-kill ${safeToKillNames.length} app(s) by name...`, safeToKillNames);
+          await Promise.allSettled(safeToKillNames.map((name) => killByName(name)));
         }
         console.log(`[SystemController] Close all complete.`);
       }
@@ -150,34 +169,60 @@ export class SystemController {
       name: "Show Info",
       description: "Shows time, battery, and music information.",
       category: "SYSTEM",
-      parameters: [],
-      handler: async () => {
-        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      parameters: [
+        {
+          name: "type",
+          type: "string",
+          description: "Type of info to show (all, battery, time, music)",
+          required: false,
+        }
+      ],
+      handler: async (params) => {
+        const type = String(params?.type || 'all').toLowerCase();
+        
+        let time = "";
+        if (type === 'all' || type === 'time') {
+          time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
         
         let batteryStr = "";
-        try {
-          if ('getBattery' in navigator) {
-            const battery: any = await (navigator as any).getBattery();
-            batteryStr = `Battery: ${Math.round(battery.level * 100)}%${battery.charging ? ' (Charging)' : ''}`;
-          }
-        } catch (_) {}
+        if (type === 'all' || type === 'battery') {
+          try {
+            const { getBatteryStatus } = await import("../../../lib/tauri-ipc");
+            const battery = await getBatteryStatus();
+            if (battery) {
+              batteryStr = `Battery: ${battery[0]}%${battery[1] ? ' (Charging)' : ''}`;
+            }
+          } catch (_) {}
+        }
 
         let musicStr = "";
-        try {
-          const { getNowPlaying } = await import("../../../lib/tauri-ipc");
-          const nowPlaying = await getNowPlaying();
-          if (nowPlaying) {
-            musicStr = `🎵 Now Playing: ${nowPlaying}`;
-          } else {
-            musicStr = "No music playing";
-          }
-        } catch (_) {}
+        if (type === 'all' || type === 'music') {
+          try {
+            const { getNowPlaying } = await import("../../../lib/tauri-ipc");
+            const nowPlaying = await getNowPlaying();
+            if (nowPlaying) {
+              musicStr = `🎵 Now Playing: ${nowPlaying}`;
+            } else if (type === 'music') {
+              musicStr = "No music playing";
+            }
+          } catch (_) {}
+        }
 
         const body = [time, batteryStr, musicStr].filter(Boolean).join("\n");
-        
-        try {
-          new Notification("System Info", { body, silent: true });
-        } catch (_) {}
+        if (body) {
+          try {
+            const { toast } = await import("sonner");
+            toast("System Info", {
+              description: body,
+            });
+          } catch (_) {
+            // Fallback
+            try {
+              new Notification("System Info", { body, silent: true });
+            } catch (_) {}
+          }
+        }
       }
     });
 

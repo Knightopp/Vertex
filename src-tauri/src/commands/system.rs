@@ -4,11 +4,45 @@
 /// Uses the Win32 `GetLastInputInfo` API on Windows.
 /// Returns 0 on non-Windows platforms (future-proofing).
 #[tauri::command]
+pub fn get_battery_status() -> Option<(u8, bool)> {
+    #[cfg(target_os = "windows")]
+    {
+        #[repr(C)]
+        struct SystemPowerStatus {
+            ac_line_status: u8,
+            battery_flag: u8,
+            battery_life_percent: u8,
+            system_status_flag: u8,
+            battery_life_time: u32,
+            battery_full_life_time: u32,
+        }
+        extern "system" {
+            fn GetSystemPowerStatus(lpSystemPowerStatus: *mut SystemPowerStatus) -> i32;
+        }
+        unsafe {
+            let mut status = SystemPowerStatus {
+                ac_line_status: 0,
+                battery_flag: 0,
+                battery_life_percent: 0,
+                system_status_flag: 0,
+                battery_life_time: 0,
+                battery_full_life_time: 0,
+            };
+            if GetSystemPowerStatus(&mut status) != 0 {
+                if status.battery_life_percent <= 100 {
+                    return Some((status.battery_life_percent, status.ac_line_status != 0));
+                }
+            }
+        }
+    }
+    None
+}
+
+#[tauri::command]
 pub fn get_idle_duration_ms() -> u64 {
     #[cfg(target_os = "windows")]
     {
         use std::mem;
-        use tauri::Manager;
 
         #[repr(C)]
         struct LastInputInfo {
@@ -92,7 +126,9 @@ pub fn set_autostart(enable: bool) -> Result<(), String> {
 pub fn launch_game(path_or_url: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         std::process::Command::new("cmd")
+            .creation_flags(0x08000000)
             .args(["/C", "start", "", &path_or_url])
             .spawn()
             .map_err(|e| format!("Failed to launch game: {}", e))?;
@@ -124,7 +160,9 @@ pub fn lock_pc() -> Result<(), String> {
 pub fn shutdown_pc() -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         std::process::Command::new("shutdown")
+            .creation_flags(0x08000000)
             .args(["/s", "/f", "/t", "0"])
             .spawn()
             .map_err(|e| format!("Failed to shutdown PC: {}", e))?;
@@ -140,7 +178,9 @@ pub fn shutdown_pc() -> Result<(), String> {
 pub fn sleep_pc() -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         std::process::Command::new("rundll32.exe")
+            .creation_flags(0x08000000)
             .args(["powrprof.dll,SetSuspendState", "0,1,0"])
             .spawn()
             .map_err(|e| format!("Failed to sleep PC: {}", e))?;
@@ -315,7 +355,7 @@ pub fn take_screenshot(app_handle: tauri::AppHandle) -> Result<String, String> {
                 chunk.swap(0, 2);
             }
 
-            let mut img = image::RgbaImage::from_raw(w as u32, h as u32, pixels)
+            let img = image::RgbaImage::from_raw(w as u32, h as u32, pixels)
                 .ok_or("Failed to create image buffer")?;
                 
             let timestamp = Local::now().format("%Y%m%d_%H%M%S").to_string();
@@ -345,6 +385,7 @@ lazy_static::lazy_static! {
 #[tauri::command]
 pub fn start_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
     use tauri::Manager;
+    use std::os::windows::process::CommandExt;
     let mut proc = FF_PROCESS.lock().unwrap();
     if proc.is_some() {
         return Err("Recording already in progress".into());
@@ -359,6 +400,7 @@ pub fn start_recording(app_handle: tauri::AppHandle) -> Result<String, String> {
     
     // Attempt to spawn ffmpeg using gdigrab
     let child = ProcessCommand::new("ffmpeg")
+        .creation_flags(0x08000000)
         .args(&[
             "-f", "gdigrab",
             "-framerate", "30",
@@ -381,9 +423,11 @@ pub fn stop_recording() -> Result<(), String> {
     if let Some(mut child) = proc.take() {
         #[cfg(target_os = "windows")]
         {
+            use std::os::windows::process::CommandExt;
             // FFmpeg needs 'q' or graceful SIGINT to finish encoding headers.
             // A simple kill corrupts mp4. Using taskkill to send close signal to ffmpeg window/console.
             let _ = ProcessCommand::new("taskkill")
+                .creation_flags(0x08000000)
                 .args(&["/PID", &child.id().to_string()])
                 .status();
         }

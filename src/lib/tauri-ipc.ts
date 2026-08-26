@@ -125,6 +125,10 @@ export async function getIdleDurationMs(): Promise<number> {
   return result ?? 0;
 }
 
+export async function getBatteryStatus(): Promise<[number, boolean] | null> {
+  return invokeCommand<[number, boolean]>("get_battery_status");
+}
+
 export async function lockPc(): Promise<void> {
   await invokeCommand("lock_pc");
 }

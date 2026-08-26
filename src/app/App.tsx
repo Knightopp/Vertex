@@ -117,47 +117,45 @@ if (type() !== "android" && type() !== "ios") {
 
 syncManager.init();
 
-import SetupProfile from "@/components/auth/SetupProfile";
-
 const AuthGuard = ({ children }: { children: React.ReactNode }) => {
-  const { session, profile, user, isLoading } = useAuthStore();
+  const { session, profile, user, isLocalMode, isLoading } = useAuthStore();
 
   useEffect(() => {
-    if (session && profile?.setup_complete) {
+    const isAuthenticated = (session || isLocalMode || user) && profile;
+    if (isAuthenticated) {
       libraryManager.autoEnrichMissingGames();
       
       // Only run process polling on PC
       if (type() !== "android" && type() !== "ios") {
         processManager.startPolling();
-        agentCore.init().then(() => {
-          // Fire a welcome greeting immediately after agent is ready.
-          // This uses cached credentials so it works fully offline.
-          const hour = new Date().getHours();
-          const greeting =
-            hour < 12 ? "Good morning" :
-            hour < 18 ? "Good afternoon" : "Good evening";
-          const name = profile?.username || user?.user_metadata?.full_name || "";
-          const body = name ? `${greeting}, ${name}.` : `${greeting}.`;
+        agentCore.init().catch(console.error);
 
-          const fireNotif = () => {
-            try {
-              new Notification("Vertex", { body, silent: true });
-            } catch (_) {}
-          };
+        // Instant offline welcome greeting immediately on boot
+        const hour = new Date().getHours();
+        const greeting =
+          hour < 12 ? "Good morning" :
+          hour < 18 ? "Good afternoon" : "Good evening";
+        const name = profile?.username || user?.user_metadata?.full_name || "Player";
+        const body = `${greeting}, ${name}.`;
 
-          if ("Notification" in window) {
-            if (Notification.permission === "granted") {
-              fireNotif();
-            } else if (Notification.permission !== "denied") {
-              Notification.requestPermission().then((perm) => {
-                if (perm === "granted") fireNotif();
-              });
-            }
+        const fireNotif = () => {
+          try {
+            new Notification("Vertex", { body, silent: true });
+          } catch (_) {}
+        };
+
+        if ("Notification" in window) {
+          if (Notification.permission === "granted") {
+            fireNotif();
+          } else if (Notification.permission !== "denied") {
+            Notification.requestPermission().then((perm) => {
+              if (perm === "granted") fireNotif();
+            });
           }
-        }).catch(console.error);
+        }
       }
     }
-  }, [session, profile?.setup_complete]);
+  }, [session, isLocalMode, user?.id, profile?.username]);
 
   if (isLoading) {
     return (
@@ -167,12 +165,8 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  if (!session) {
+  if (!session && !isLocalMode && !user) {
     return <Auth />;
-  }
-
-  if (!profile?.setup_complete) {
-    return <SetupProfile />;
   }
 
   return (

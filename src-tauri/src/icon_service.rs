@@ -26,8 +26,11 @@ pub fn get_or_extract_icon(exe_path: &str, hash: &str, app_data_dir: &Path) -> O
         icon_path.to_string_lossy().replace("'", "''")
     );
 
+    use std::os::windows::process::CommandExt;
     let output = Command::new("powershell")
-        .args(&["-NoProfile", "-NonInteractive", "-Command", &ps_script])
+        .creation_flags(0x08000000)
+        .args(&[
+            "-NoProfile", "-NonInteractive", "-Command", &ps_script])
         .output();
 
     if let Ok(out) = output {

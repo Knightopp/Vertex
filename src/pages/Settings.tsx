@@ -15,18 +15,38 @@ import { useEffect } from "react";
 import { discordPresenceManager } from "@/services/DiscordPresenceManager";
 import PresetEditor from "@/features/presets/components/PresetEditor";
 
+import { useAuthStore } from "@/stores/auth-store";
+
 export default function Settings() {
   const { settings, updateSettings, isLoading } = useSettingsStore();
+  const { user, profile, isLocalMode, updateProfile } = useAuthStore();
   const { checkForUpdates, isCheckingUpdate, updateAvailable } = useAppStore();
   const [appVersion, setAppVersion] = useState("1.0.0");
   const [activeTab, setActiveTab] = useState<"general" | "library" | "metadata" | "integrations" | "presets">("general");
   const [newScanPath, setNewScanPath] = useState("");
   const [isSyncingSteam, setIsSyncingSteam] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [editUsername, setEditUsername] = useState(profile?.username || "");
+
+  useEffect(() => {
+    if (profile?.username) {
+      setEditUsername(profile.username);
+    }
+  }, [profile?.username]);
 
   useEffect(() => {
     getVersion().then(setAppVersion).catch(console.error);
   }, []);
+
+  const handleSaveUsername = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editUsername.trim()) {
+      toast.error("Username cannot be empty");
+      return;
+    }
+    await updateProfile({ username: editUsername.trim() });
+    toast.success("Profile username updated successfully!");
+  };
 
   if (isLoading) {
     return (
@@ -229,6 +249,45 @@ export default function Settings() {
               animate={{ opacity: 1, y: 0 }}
               className="flex flex-col gap-10"
             >
+              <section>
+                <SectionHeading title="User Profile" />
+                <div className="mt-4 flex flex-col gap-4">
+                  <div className="p-6 rounded-2xl bg-black/20 border border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-full overflow-hidden bg-white/10 flex items-center justify-center text-white font-bold text-xl border border-white/10 shrink-0">
+                        {profile?.avatar_url || user?.user_metadata?.avatar_url ? (
+                          <img src={profile?.avatar_url || user?.user_metadata?.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                          (profile?.username?.[0] || "P").toUpperCase()
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white text-lg">{profile?.username || "Player"}</h4>
+                        <p className="text-white/40 text-xs mt-0.5">
+                          {isLocalMode ? "Local Offline Profile (Saved on PC)" : (user?.email || "Cloud Connected Profile")}
+                        </p>
+                      </div>
+                    </div>
+
+                    <form onSubmit={handleSaveUsername} className="flex items-center gap-2 w-full sm:w-auto">
+                      <input
+                        type="text"
+                        value={editUsername}
+                        onChange={(e) => setEditUsername(e.target.value)}
+                        placeholder="Enter username"
+                        className="px-4 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:border-white/50 text-sm flex-1 sm:w-48"
+                      />
+                      <button
+                        type="submit"
+                        className="px-5 py-2.5 rounded-xl bg-white hover:bg-white/90 text-black font-bold text-sm transition-colors shrink-0"
+                      >
+                        Save
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </section>
+
               <section>
                 <SectionHeading title="Cloud Synchronization" />
                 <div className="mt-4 flex flex-col gap-4">

@@ -4,14 +4,25 @@ import { supabase } from "@/lib/supabase";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 
+export interface Profile {
+  id: string;
+  username: string;
+  avatar_url: string;
+  setup_complete: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+const LOCAL_USER_ID = "local_user";
+const CACHED_PROFILE_KEY = "vazorism_cached_profile";
+const LOCAL_PROFILE_KEY = "vazorism_local_profile";
+
 // ---------------------------------------------------------------------------
 // Offline-first: synchronously read the cached Supabase session from
 // localStorage so the app renders immediately without waiting for the network.
 // ---------------------------------------------------------------------------
 function readCachedSession(): { session: Session | null; user: User | null } {
   try {
-    // Supabase v2 stores its session under a key like
-    // "sb-<project-ref>-auth-token" in localStorage.
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.startsWith("sb-") && key.endsWith("-auth-token")) {
@@ -31,145 +42,318 @@ function readCachedSession(): { session: Session | null; user: User | null } {
   return { session: null, user: null };
 }
 
-const _cached = readCachedSession();
+function readCachedProfile(userId?: string): Profile | null {
+  try {
+    if (userId && userId !== LOCAL_USER_ID) {
+      const userSpecific = localStorage.getItem(`${CACHED_PROFILE_KEY}_${userId}`);
+      if (userSpecific) return JSON.parse(userSpecific);
+    }
+    const generic = localStorage.getItem(CACHED_PROFILE_KEY);
+    if (generic) return JSON.parse(generic);
 
-export interface Profile {
-  id: string;
-  username: string;
-  avatar_url: string;
-  setup_complete: boolean;
-  created_at: string;
-  updated_at: string;
+    const localProf = localStorage.getItem(LOCAL_PROFILE_KEY);
+    if (localProf) return JSON.parse(localProf);
+  } catch (_) {}
+  return null;
+}
+
+function saveCachedProfile(profile: Profile) {
+  try {
+    localStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify(profile));
+    if (profile.id) {
+      localStorage.setItem(`${CACHED_PROFILE_KEY}_${profile.id}`, JSON.stringify(profile));
+    }
+    if (profile.id === LOCAL_USER_ID) {
+      localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(profile));
+    }
+  } catch (_) {}
+}
+
+function deriveDefaultProfile(user: User | null, customUsername?: string): Profile {
+  const id = user?.id || LOCAL_USER_ID;
+  const rawName =
+    customUsername ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.user_metadata?.custom_claims?.global_name ||
+    user?.user_metadata?.preferred_username ||
+    user?.user_metadata?.user_name ||
+    user?.email?.split("@")[0] ||
+    "Player";
+
+  const cleanUsername = rawName.replace(/[^a-zA-Z0-9_.]/g, "").substring(0, 20) || "Player";
+  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || "";
+
+  return {
+    id,
+    username: cleanUsername,
+    avatar_url: avatarUrl,
+    setup_complete: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+// Pre-hydrate everything synchronously from localStorage on module load
+const _cachedSession = readCachedSession();
+let _cachedProfile = _cachedSession.user ? readCachedProfile(_cachedSession.user.id) : readCachedProfile();
+const _hasLocalProfile = localStorage.getItem(LOCAL_PROFILE_KEY) !== null;
+
+let _initialUser = _cachedSession.user;
+let _isLocalMode = false;
+
+if (_initialUser) {
+  if (!_cachedProfile) {
+    _cachedProfile = deriveDefaultProfile(_initialUser);
+    saveCachedProfile(_cachedProfile);
+  }
+} else if (_hasLocalProfile && _cachedProfile) {
+  _isLocalMode = true;
+  _initialUser = {
+    id: LOCAL_USER_ID,
+    email: "local@vertex.app",
+    user_metadata: { full_name: _cachedProfile.username },
+    app_metadata: {},
+    aud: "authenticated",
+    created_at: _cachedProfile.created_at || new Date().toISOString(),
+  } as unknown as User;
 }
 
 interface AuthState {
   session: Session | null;
   user: User | null;
   profile: Profile | null;
+  isLocalMode: boolean;
   isLoading: boolean;
   initialize: () => void;
   signInWithDiscord: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  loginAsLocal: (customUsername?: string) => void;
   signOut: () => Promise<void>;
   fetchProfile: (userId: string) => Promise<void>;
+  updateProfile: (updates: Partial<Profile>) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  // Pre-hydrate from the cache: if we have a session already, skip the
-  // loading spinner entirely so the app shows instantly (even offline).
-  session: _cached.session,
-  user: _cached.user,
-  profile: null,
-  isLoading: _cached.session === null, // Only show spinner if truly no session
+  session: _cachedSession.session,
+  user: _initialUser,
+  profile: _cachedProfile,
+  isLocalMode: _isLocalMode,
+  isLoading: false, // 0ms delay: instant render from pre-hydrated state
+
+  loginAsLocal: (customUsername?: string) => {
+    const existing = readCachedProfile(LOCAL_USER_ID) || readCachedProfile();
+    const username = (customUsername && customUsername.trim()) || existing?.username || "Player";
+    const localProfile: Profile = {
+      id: LOCAL_USER_ID,
+      username,
+      avatar_url: existing?.avatar_url || "",
+      setup_complete: true,
+      created_at: existing?.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    saveCachedProfile(localProfile);
+
+    const fakeUser = {
+      id: LOCAL_USER_ID,
+      email: "local@vertex.app",
+      user_metadata: { full_name: username },
+      app_metadata: {},
+      aud: "authenticated",
+      created_at: localProfile.created_at,
+    } as unknown as User;
+
+    set({
+      session: null,
+      user: fakeUser,
+      profile: localProfile,
+      isLocalMode: true,
+      isLoading: false,
+    });
+  },
 
   fetchProfile: async (userId: string) => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
+    if (userId === LOCAL_USER_ID) {
+      const local = readCachedProfile(LOCAL_USER_ID);
+      if (local) set({ profile: local });
+      return;
+    }
 
-    if (!error && data) {
-      set({ profile: data });
-    } else {
-      set({ profile: null });
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
+      if (!error && data) {
+        const merged: Profile = {
+          ...data,
+          setup_complete: true, // auto-complete
+        };
+        set({ profile: merged });
+        saveCachedProfile(merged);
+      } else if (error) {
+        // If table row not found or network error, ensure local cached profile remains
+        const current = get().profile;
+        if (!current) {
+          const autoProfile = deriveDefaultProfile(get().user);
+          set({ profile: autoProfile });
+          saveCachedProfile(autoProfile);
+
+          if (navigator.onLine) {
+            supabase.from("profiles").upsert({
+              id: userId,
+              username: autoProfile.username,
+              avatar_url: autoProfile.avatar_url,
+              setup_complete: true,
+              updated_at: new Date().toISOString(),
+            }).then(null, () => {});
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[AuthStore] fetchProfile offline fallback active:", err);
+    }
+  },
+
+  updateProfile: async (updates: Partial<Profile>) => {
+    const current = get().profile;
+    const user = get().user;
+    const id = current?.id || user?.id || LOCAL_USER_ID;
+
+    const updated: Profile = {
+      id,
+      username: updates.username?.trim() || current?.username || "Player",
+      avatar_url: updates.avatar_url !== undefined ? updates.avatar_url : (current?.avatar_url || ""),
+      setup_complete: true,
+      created_at: current?.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      ...updates,
+    };
+
+    set({ profile: updated });
+    saveCachedProfile(updated);
+
+    if (id !== LOCAL_USER_ID && navigator.onLine) {
+      supabase.from("profiles").upsert({
+        id,
+        username: updated.username,
+        avatar_url: updated.avatar_url,
+        setup_complete: true,
+        updated_at: updated.updated_at,
+      }).then(null, (e: unknown) => console.warn("[AuthStore] Supabase profile sync failed:", e));
     }
   },
 
   initialize: () => {
-    // If we already have a cached session, fetch the profile in background
-    // without blocking the UI.
-    if (_cached.session?.user) {
-      get().fetchProfile(_cached.session.user.id).catch(() => {});
+    const state = get();
+    if (state.user && state.user.id !== LOCAL_USER_ID) {
+      state.fetchProfile(state.user.id).catch(() => {});
     }
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        set({ session, user: session.user, isLoading: false });
+        const cached = readCachedProfile(session.user.id) || deriveDefaultProfile(session.user);
+        saveCachedProfile(cached);
+        set({ session, user: session.user, profile: cached, isLocalMode: false, isLoading: false });
         get().fetchProfile(session.user.id).catch(() => {});
-      } else {
-        // No valid session from the server — clear any stale cached data
-        set({ session: null, user: null, profile: null, isLoading: false });
+      } else if (!get().isLocalMode) {
+        const localProf = readCachedProfile(LOCAL_USER_ID);
+        if (localProf) {
+          get().loginAsLocal(localProf.username);
+        } else {
+          set({ session: null, user: null, profile: null, isLoading: false });
+        }
       }
     }).catch(() => {
-      // Network error (offline) — keep cached session active, clear spinner
+      // Offline: keep cached data intact with zero disruption
       set({ isLoading: false });
     });
 
     supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        set({ session, user: session.user });
-        // Don't set isLoading to true on every event to avoid flickering,
-        // but ensure we fetch the profile if the session changes
-        await get().fetchProfile(session.user.id);
-        set({ isLoading: false });
-      } else {
+        const cached = readCachedProfile(session.user.id) || deriveDefaultProfile(session.user);
+        saveCachedProfile(cached);
+        set({ session, user: session.user, profile: cached, isLocalMode: false, isLoading: false });
+        get().fetchProfile(session.user.id).catch(() => {});
+      } else if (!get().isLocalMode) {
         set({ session: null, user: null, profile: null, isLoading: false });
       }
     });
 
-    // Listen for deep link callbacks from the system browser
-    // e.g., vazorism://auth#access_token=...&refresh_token=...
+    // Deep link handlers for desktop OAuth
     const processDeepLink = async (url: string) => {
-      import("sonner").then(({ toast }) => toast.info("Deep link received: " + url));
-      
       const urlObj = new URL(url);
 
-      // 1. Check for Implicit flow (access_token in hash)
       if (url.includes("access_token=")) {
-        import("sonner").then(({ toast }) => toast.info("Detected Implicit flow, parsing tokens..."));
         const hashIndex = url.indexOf("#");
         if (hashIndex !== -1) {
           const hash = url.substring(hashIndex + 1);
           const params = new URLSearchParams(hash);
           const access_token = params.get("access_token");
           const refresh_token = params.get("refresh_token");
-          
+
           if (access_token && refresh_token) {
-            import("sonner").then(({ toast }) => toast.info("Setting implicit session..."));
-            const { error } = await supabase.auth.setSession({
+            const { data, error } = await supabase.auth.setSession({
               access_token,
               refresh_token,
             });
-            if (error) {
-              import("sonner").then(({ toast }) => toast.error("Session error: " + error.message));
-            } else {
-              import("sonner").then(({ toast }) => toast.success("Successfully logged in!"));
+            if (!error && data?.user) {
+              const autoProfile = deriveDefaultProfile(data.user);
+              saveCachedProfile(autoProfile);
+              set({
+                session: data.session,
+                user: data.user,
+                profile: autoProfile,
+                isLocalMode: false,
+                isLoading: false,
+              });
+              // Auto-upsert to Supabase
+              supabase.from("profiles").upsert({
+                id: data.user.id,
+                username: autoProfile.username,
+                avatar_url: autoProfile.avatar_url,
+                setup_complete: true,
+                updated_at: new Date().toISOString(),
+              }).then(null, () => {});
             }
-          } else {
-            import("sonner").then(({ toast }) => toast.error("Tokens missing in implicit deep link"));
           }
         }
-      } 
-      // 2. Check for PKCE flow (code in query params)
-      else if (urlObj.searchParams.has("code")) {
+      } else if (urlObj.searchParams.has("code")) {
         const code = urlObj.searchParams.get("code");
-        import("sonner").then(({ toast }) => toast.info("Detected PKCE flow. Exchanging code..."));
-        
         if (code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) {
-            import("sonner").then(({ toast }) => toast.error("PKCE exchange failed: " + error.message));
-          } else {
-            import("sonner").then(({ toast }) => toast.success("Successfully logged in via PKCE!"));
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          if (!error && data?.user) {
+            const autoProfile = deriveDefaultProfile(data.user);
+            saveCachedProfile(autoProfile);
+            set({
+              session: data.session,
+              user: data.user,
+              profile: autoProfile,
+              isLocalMode: false,
+              isLoading: false,
+            });
+            supabase.from("profiles").upsert({
+              id: data.user.id,
+              username: autoProfile.username,
+              avatar_url: autoProfile.avatar_url,
+              setup_complete: true,
+              updated_at: new Date().toISOString(),
+            }).then(null, () => {});
           }
         }
-      } else {
-         import("sonner").then(({ toast }) => toast.warning("Deep link recognized but no auth tokens found."));
       }
     };
 
     onOpenUrl(async (urls) => {
-      import("sonner").then(({ toast }) => toast.info("onOpenUrl triggered with: " + urls.length + " urls"));
       for (const url of urls) {
         await processDeepLink(url);
       }
     }).catch(console.error);
 
-    // Fallback: Tauri single instance manual emission (Removed from Rust, but keeping listener just in case)
     import("@tauri-apps/api/event").then(({ listen }) => {
       listen<string[]>("deep-link-received", async (event) => {
-        import("sonner").then(({ toast }) => toast.info("deep-link-received event fired!"));
         for (const arg of event.payload) {
           if (arg.startsWith("vazorism://")) {
             await processDeepLink(arg);
@@ -178,47 +362,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
     }).catch(console.error);
 
-    // Bulletproof Fallback: Poll Rust backend state every 1 second
     import("@tauri-apps/api/core").then(({ invoke }) => {
       setInterval(async () => {
         try {
           const url: string | null = await invoke("get_deep_link");
           if (url && url.startsWith("vazorism://")) {
-            import("sonner").then(({ toast }) => toast.info("Deep link pulled from Rust polling fallback!"));
             await processDeepLink(url);
           }
-        } catch (err) {
-          // Ignore errors
-        }
+        } catch (_) {}
       }, 1000);
     }).catch(console.error);
 
-    // Initial check for Android cold starts
     import("@tauri-apps/plugin-deep-link").then(async ({ getCurrent }) => {
       try {
         const payload: any = await getCurrent();
-        
         let urlsToProcess: string[] = [];
         if (Array.isArray(payload)) {
-           urlsToProcess = payload;
-        } else if (payload && typeof payload === 'object' && typeof payload.url === 'string') {
-           urlsToProcess = [payload.url];
+          urlsToProcess = payload;
+        } else if (payload && typeof payload === "object" && typeof payload.url === "string") {
+          urlsToProcess = [payload.url];
         }
-
-        if (urlsToProcess.length > 0) {
-          import("sonner").then(({ toast }) => toast.info("Cold-start deep link received!"));
-          for (const url of urlsToProcess) {
-            await processDeepLink(url);
-          }
+        for (const url of urlsToProcess) {
+          await processDeepLink(url);
         }
-      } catch (e) {
-        console.error("getCurrent error:", e);
-      }
+      } catch (_) {}
     }).catch(console.error);
   },
 
   signInWithDiscord: async () => {
-    import("sonner").then(({ toast }) => toast.info("Initiating Discord OAuth..."));
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "discord",
       options: {
@@ -226,19 +397,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         redirectTo: "vazorism://auth",
       },
     });
-    
     if (error) {
-        import("sonner").then(({ toast }) => toast.error("OAuth init failed: " + error.message));
+      import("sonner").then(({ toast }) => toast.error("OAuth init failed: " + error.message));
     }
-
     if (data?.url) {
-      import("sonner").then(({ toast }) => toast.info("Opening browser for Discord..."));
       await openUrl(data.url);
     }
   },
 
   signInWithGoogle: async () => {
-    import("sonner").then(({ toast }) => toast.info("Initiating Google OAuth..."));
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -246,18 +413,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         redirectTo: "vazorism://auth",
       },
     });
-
     if (error) {
-        import("sonner").then(({ toast }) => toast.error("OAuth init failed: " + error.message));
+      import("sonner").then(({ toast }) => toast.error("OAuth init failed: " + error.message));
     }
-
     if (data?.url) {
-      import("sonner").then(({ toast }) => toast.info("Opening browser for Google..."));
       await openUrl(data.url);
     }
   },
 
   signOut: async () => {
-    await supabase.auth.signOut();
+    localStorage.removeItem(CACHED_PROFILE_KEY);
+    localStorage.removeItem(LOCAL_PROFILE_KEY);
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("sb-") && key.endsWith("-auth-token")) {
+        localStorage.removeItem(key);
+      }
+    }
+    set({ session: null, user: null, profile: null, isLocalMode: false, isLoading: false });
+    try {
+      await supabase.auth.signOut();
+    } catch (_) {}
   },
 }));

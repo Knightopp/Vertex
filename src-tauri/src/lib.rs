@@ -169,6 +169,7 @@ pub fn run() {
             commands::process::get_process_by_pid,
             commands::process::get_process_icon,
             commands::process::get_active_window,
+            commands::system::get_battery_status,
             get_idle_duration_ms,
             migrate_old_data,
             commands::system::set_autostart,
