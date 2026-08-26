@@ -110,6 +110,11 @@ export async function killByName(name: string): Promise<void> {
   await invokeCommand("kill_by_name", { name });
 }
 
+/** Get the currently playing song title from Spotify's window title. Returns null if nothing playing. */
+export async function getNowPlaying(): Promise<string | null> {
+  return invokeCommand<string>("get_now_playing");
+}
+
 // ─────────────────────────────────────────────
 // System Commands
 // ─────────────────────────────────────────────

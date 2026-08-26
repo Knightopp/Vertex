@@ -3,7 +3,7 @@ import { open } from "@tauri-apps/plugin-shell";
 import { invoke } from "@tauri-apps/api/core";
 import { availableMonitors } from "@tauri-apps/api/window";
 import { libraryManager } from "../../LibraryManager";
-import { getRunningProcesses, focusWindow, closeWindow, forceCloseProcess, maximizeWindow, restoreWindow, moveWindow } from "../../../lib/tauri-ipc";
+import { getRunningProcesses, focusWindow, forceCloseProcess, maximizeWindow, restoreWindow, moveWindow } from "../../../lib/tauri-ipc";
 
 export class AppController {
   init() {

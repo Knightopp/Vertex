@@ -183,6 +183,7 @@ pub fn run() {
             commands::process::close_window,
             commands::process::force_close_process,
             commands::process::kill_by_name,
+            commands::process::get_now_playing,
             commands::process::restore_window,
             commands::process::move_window,
             commands::system::lock_pc,

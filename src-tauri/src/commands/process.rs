@@ -354,9 +354,15 @@ pub fn close_window(pid: u32) -> Result<(), String> {
 
         // Always follow through with taskkill /PID (graceful, no /F).
         // This handles apps like Spotify that silently ignore WM_CLOSE.
-        let _ = std::process::Command::new("taskkill")
-            .args(["/PID", &pid.to_string()])
-            .status();
+        // CREATE_NO_WINDOW prevents the console flash on screen.
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            let _ = std::process::Command::new("taskkill")
+                .args(["/PID", &pid.to_string()])
+                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                .status();
+        }
 
         return Ok(());
     }
@@ -378,10 +384,15 @@ pub fn force_close_process(pid: u32) -> Result<(), String> {
                 }
             }
         }
-        // Fallback to taskkill /F /T
-        let _ = std::process::Command::new("taskkill")
-            .args(["/F", "/T", "/PID", &pid.to_string()])
-            .status();
+        // Fallback to taskkill /F /T — no console flash
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            let _ = std::process::Command::new("taskkill")
+                .args(["/F", "/T", "/PID", &pid.to_string()])
+                .creation_flags(0x08000000)
+                .status();
+        }
         Ok(())
     }
     #[cfg(not(target_os = "windows"))]
@@ -404,8 +415,10 @@ pub fn kill_by_name(name: String) -> Result<(), String> {
             format!("{}.exe", name)
         };
 
+        use std::os::windows::process::CommandExt;
         let status = std::process::Command::new("taskkill")
             .args(["/F", "/IM", &exe_name])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW — no console flash
             .status();
 
         match status {
@@ -420,3 +433,27 @@ pub fn kill_by_name(name: String) -> Result<(), String> {
     }
 }
 
+/// Get the currently playing song by reading the Spotify window title.
+/// Spotify sets its window title to "Artist - Song" when music is playing.
+#[tauri::command]
+pub fn get_now_playing() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        let windows = crate::window_enum::get_top_level_processes();
+        for w in &windows {
+            let name = w.exe_path.to_lowercase();
+            if name.contains("spotify") {
+                let title = w.window_title.trim().to_string();
+                // Spotify title is "Artist - Song" when playing, just "Spotify" when paused/idle
+                if !title.is_empty() && title.to_lowercase() != "spotify" && title != "" {
+                    return Some(title);
+                }
+            }
+        }
+        None
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        None
+    }
+}

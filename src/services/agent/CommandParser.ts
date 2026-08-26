@@ -27,7 +27,13 @@ export class CommandParser {
   async refreshInstalledApps() {
     try {
       const { getInstalledApps } = await import('../../lib/tauri-ipc');
-      this.installedAppsCache = await getInstalledApps();
+      const apps = await getInstalledApps();
+      // Sanitize app names to remove weird non-printable or unicode chars
+      // that can cause fuzzy-match garbage (e.g. from registry weirdness)
+      this.installedAppsCache = apps.map(app => ({
+        ...app,
+        name: app.name.replace(/[^\x20-\x7E]/g, '').trim()
+      })).filter(app => app.name.length > 0);
     } catch (_) {}
   }
 
@@ -103,7 +109,19 @@ export class CommandParser {
     const closeAppMatch = lowerText.match(/^(?:close|kill|quit|exit|stop)\s+(.+)$/i);
     if (closeAppMatch) {
       const targetApp = closeAppMatch[1].trim();
-      if (targetApp === "all" || targetApp === "all apps" || targetApp === "everything") {
+      
+      const exceptMatch = targetApp.match(/^(?:all|everything|all apps)\s+(?:except|but)\s+(.+)$/i);
+      if (exceptMatch) {
+        const exceptApp = exceptMatch[1].trim();
+        const capitalized = exceptApp.charAt(0).toUpperCase() + exceptApp.slice(1);
+        dynamicResults.push({
+          title: `Close All Except ${capitalized}`,
+          actionId: "close_all_apps",
+          parameters: { exceptApp: capitalized },
+          originalText: text,
+          score: -1.6
+        });
+      } else if (targetApp === "all" || targetApp === "all apps" || targetApp === "everything") {
         dynamicResults.push({
           title: "Close All Applications",
           actionId: "close_all_apps",
@@ -152,6 +170,17 @@ export class CommandParser {
         parameters: { level: parseInt(volMatch[1], 10) },
         originalText: text,
         score: -0.5
+      });
+    }
+
+    // 3.5 "Show" command for info
+    if (lowerText === "show" || lowerText === "info" || lowerText === "time" || lowerText === "battery" || lowerText === "now playing") {
+      dynamicResults.push({
+        title: "Show System Info",
+        actionId: 'show_info',
+        parameters: {},
+        originalText: text,
+        score: -1.2
       });
     }
 
@@ -345,6 +374,12 @@ export class CommandParser {
         actionId: "stop_recording",
         parameters: {},
         searchTerms: ["stop recording", "end recording", "save video"]
+      },
+      {
+        title: "Show System Info",
+        actionId: "show_info",
+        parameters: {},
+        searchTerms: ["show", "info", "time", "battery", "now playing", "music playing"]
       }
     );
 
