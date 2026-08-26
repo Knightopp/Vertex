@@ -1,25 +1,26 @@
-import React, { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Command } from "cmdk";
 import { actionExecutor } from "@/services/agent/ActionExecutor";
 import { commandParser, ParsedCommand } from "@/services/agent/CommandParser";
-import { Terminal, Globe, Folder, PlayCircle, StopCircle, VolumeX, Lock, MonitorUp, Power, Moon, XCircle } from "lucide-react";
+import {
+  Terminal, Globe, Folder, PlayCircle, StopCircle,
+  VolumeX, Lock, MonitorUp, Power, Moon, XCircle, Search,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Note: To map generic actionIds to icons
 const getIconForAction = (actionId: string) => {
-  if (actionId === 'launch_app') return <MonitorUp className="w-4 h-4" />;
-  if (actionId === 'start_preset') return <PlayCircle className="w-4 h-4" />;
-  if (actionId === 'stop_preset') return <StopCircle className="w-4 h-4" />;
-  if (actionId === 'open_website') return <Globe className="w-4 h-4" />;
-  if (actionId === 'open_folder') return <Folder className="w-4 h-4" />;
-  if (actionId === 'mute') return <VolumeX className="w-4 h-4" />;
-  if (actionId === 'lock_pc') return <Lock className="w-4 h-4" />;
-  if (actionId === 'shutdown') return <Power className="w-4 h-4 text-red-400" />;
-  if (actionId === 'sleep') return <Moon className="w-4 h-4 text-blue-400" />;
-  if (actionId === 'close_all_apps') return <XCircle className="w-4 h-4 text-amber-400" />;
-  return <Terminal className="w-4 h-4" />;
+  const cls = "w-3.5 h-3.5";
+  if (actionId === "launch_app")    return <MonitorUp className={cls} />;
+  if (actionId === "start_preset")  return <PlayCircle className={cls} />;
+  if (actionId === "stop_preset")   return <StopCircle className={cls} />;
+  if (actionId === "open_website")  return <Globe className={cls} />;
+  if (actionId === "open_folder")   return <Folder className={cls} />;
+  if (actionId === "mute")          return <VolumeX className={cls} />;
+  if (actionId === "lock_pc")       return <Lock className={cls} />;
+  if (actionId === "shutdown")      return <Power className={cls} />;
+  if (actionId === "sleep")         return <Moon className={cls} />;
+  if (actionId === "close_all_apps")return <XCircle className={cls} />;
+  return <Terminal className={cls} />;
 };
 
 interface AgentCommandBarProps {
@@ -30,46 +31,54 @@ interface AgentCommandBarProps {
 export const AgentCommandBar: React.FC<AgentCommandBarProps> = ({ embedded, onClose }) => {
   const [inputValue, setInputValue] = useState("");
   const [suggestions, setSuggestions] = useState<ParsedCommand[]>([]);
-  const inputRef = React.useRef<HTMLInputElement>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  // Focus on mount
   useEffect(() => {
-    // Focus input on mount and whenever window gets focus
-    inputRef.current?.focus();
-
-    const handleKeyDown = async (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        await hideCommandBar();
-      }
-    };
-
-    const handleWindowFocus = () => {
-      inputRef.current?.focus();
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("focus", handleWindowFocus);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("focus", handleWindowFocus);
-    };
+    const timer = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(timer);
   }, []);
 
+  // Re-focus when the window receives focus (for the floating window mode)
+  useEffect(() => {
+    const handleFocus = () => inputRef.current?.focus();
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, []);
+
+  // Global Escape key
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      if (e.key === "Escape") await hideCommandBar();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Parse suggestions whenever input changes
   useEffect(() => {
     if (inputValue.trim()) {
       setSuggestions(commandParser.parse(inputValue));
     } else {
       setSuggestions([]);
     }
+    setSelectedIndex(0);
   }, [inputValue]);
+
+  // Scroll selected item into view
+  useEffect(() => {
+    itemRefs.current[selectedIndex]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [selectedIndex]);
 
   const hideCommandBar = async () => {
     if (embedded) {
       onClose?.();
     } else {
       try {
-        const win = getCurrentWindow();
-        await win.hide();
+        await getCurrentWindow().hide();
       } catch (e) {
         console.error(e);
       }
@@ -78,52 +87,22 @@ export const AgentCommandBar: React.FC<AgentCommandBarProps> = ({ embedded, onCl
   };
 
   const defaultQuickActions: ParsedCommand[] = [
-    {
-      actionId: "take_screenshot",
-      title: "Take Screenshot",
-      confidence: 1,
-      parameters: {},
-    },
-    {
-      actionId: "launch_app",
-      title: "Open Spotify",
-      confidence: 1,
-      parameters: { appName: "Spotify" },
-    },
-    {
-      actionId: "launch_app",
-      title: "Open Steam",
-      confidence: 1,
-      parameters: { appName: "Steam" },
-    },
-    {
-      actionId: "open_website",
-      title: "Open YouTube",
-      confidence: 1,
-      parameters: { url: "https://www.youtube.com" },
-    },
-    {
-      actionId: "mute",
-      title: "Toggle Mute",
-      confidence: 1,
-      parameters: {},
-    },
-    {
-      actionId: "lock_pc",
-      title: "Lock PC",
-      confidence: 1,
-      parameters: {},
-    },
+    { actionId: "launch_app",    title: "Open Spotify",            parameters: { appName: "Spotify" },          originalText: "open spotify" },
+    { actionId: "close_app",     title: "Close Spotify",           parameters: { appName: "Spotify" },          originalText: "close spotify" },
+    { actionId: "open_website",  title: "Open YouTube",            parameters: { url: "https://www.youtube.com" }, originalText: "open youtube" },
+    { actionId: "close_app",     title: "Close YouTube",           parameters: { appName: "YouTube" },          originalText: "close youtube" },
+    { actionId: "close_app",     title: "Close Photos / Images",   parameters: { appName: "Photos" },           originalText: "close photos" },
+    { actionId: "close_all_apps",title: "Close All Applications",  parameters: {},                               originalText: "close all" },
+    { actionId: "take_screenshot",title: "Take Screenshot",        parameters: {},                               originalText: "screenshot" },
+    { actionId: "mute",          title: "Toggle Mute",             parameters: {},                               originalText: "mute" },
+    { actionId: "lock_pc",       title: "Lock PC",                 parameters: {},                               originalText: "lock" },
+    { actionId: "shutdown",      title: "Shutdown PC",             parameters: {},                               originalText: "shutdown" },
   ];
 
   const displayedCommands = inputValue.trim() ? suggestions : defaultQuickActions;
 
-  const [executingTitle, setExecutingTitle] = useState<string | null>(null);
-
   const handleSelect = async (command: ParsedCommand) => {
-    // Hide the command bar immediately on single click
     await hideCommandBar();
-    
     try {
       await actionExecutor.execute(command.actionId, command.parameters);
     } catch (e) {
@@ -131,79 +110,129 @@ export const AgentCommandBar: React.FC<AgentCommandBarProps> = ({ embedded, onCl
     }
   };
 
+  // Arrow-key / Enter navigation — captured on the input element
+  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const count = displayedCommands.length;
+    if (count === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev + 1) % count);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev - 1 + count) % count);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const target = displayedCommands[selectedIndex] ?? displayedCommands[0];
+      if (target) await handleSelect(target);
+    }
+  };
+
   return (
-    <div className="w-full h-full p-0 m-0 bg-[#161622] rounded-2xl border border-white/20 shadow-2xl overflow-hidden flex flex-col select-none">
-      <Command 
-        shouldFilter={false}
-        className="flex flex-col w-full h-full bg-[#161622] text-white"
+    <div
+      className="w-full h-full flex flex-col bg-black border border-white/10 rounded-2xl overflow-hidden shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_24px_64px_rgba(0,0,0,0.8)] select-none"
+    >
+      {/* ── Search bar ─────────────────────────────────────── */}
+      <div
+        className="flex items-center gap-3 px-4 py-3 border-b border-white/8 shrink-0"
+        style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
       >
-        {/* Header Search Input */}
-        <div className="flex items-center px-4 py-2.5 border-b border-white/10 bg-[#1b1b2a] shrink-0" style={{ WebkitAppRegion: "drag" } as any}>
-          <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-400 mr-3 shrink-0">
-            <Terminal className="w-4 h-4" />
-          </div>
-          <input
-            ref={inputRef}
-            autoFocus
-            placeholder="Type a command or URL (e.g. 'spotify', 'hello.com', 'screenshot')..."
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={async (e) => {
-              if (e.key === "Enter" && displayedCommands.length > 0) {
-                await handleSelect(displayedCommands[0]);
-              }
-            }}
-            className="w-full bg-transparent border-none py-1 text-sm font-medium text-white placeholder:text-white/40 focus:outline-none focus:ring-0"
-            style={{ WebkitAppRegion: "no-drag" } as any}
-          />
-          {inputValue && (
-            <button
-              onMouseDown={(e) => { e.preventDefault(); setInputValue(""); }}
-              className="text-xs px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-white/70 transition shrink-0"
-              style={{ WebkitAppRegion: "no-drag" } as any}
-            >
-              Clear
-            </button>
-          )}
+        <Search className="w-4 h-4 text-white/30 shrink-0" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties} />
+        <input
+          ref={inputRef}
+          autoFocus
+          spellCheck={false}
+          placeholder="Type a command…"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="flex-1 bg-transparent border-none text-sm font-medium text-white placeholder:text-white/25 focus:outline-none focus:ring-0 caret-white"
+          style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+        />
+        {inputValue && (
+          <button
+            onMouseDown={(e) => { e.preventDefault(); setInputValue(""); }}
+            className="text-[11px] px-2 py-0.5 rounded bg-white/8 hover:bg-white/15 text-white/40 hover:text-white/70 transition shrink-0 font-mono"
+            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+          >
+            esc
+          </button>
+        )}
+      </div>
+
+      {/* ── Section label ──────────────────────────────────── */}
+      {!inputValue && (
+        <div className="px-4 pt-3 pb-1">
+          <span className="text-[10px] font-semibold tracking-widest uppercase text-white/20">
+            Quick Actions
+          </span>
         </div>
+      )}
 
-        {/* Action List */}
-        <Command.List className="flex-1 overflow-y-auto p-2 custom-scrollbar bg-[#161622]" style={{ WebkitAppRegion: "no-drag" } as any}>
-          {!inputValue && (
-            <div className="px-3 pt-1 pb-1 text-[10px] font-bold tracking-wider uppercase text-purple-400">
-              Suggested Actions
-            </div>
-          )}
-          
-          {inputValue && suggestions.length === 0 && (
-            <div className="py-8 text-center text-white/40 text-sm">
-              No matching commands found for "{inputValue}"
-            </div>
-          )}
+      {/* ── Command list ───────────────────────────────────── */}
+      <div
+        ref={listRef}
+        className="flex-1 overflow-y-auto p-2 space-y-0.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
+        style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+      >
+        {inputValue && suggestions.length === 0 && (
+          <div className="py-10 text-center text-white/25 text-sm">
+            No commands found for &ldquo;{inputValue}&rdquo;
+          </div>
+        )}
 
-          {displayedCommands.map((command, idx) => (
+        {displayedCommands.map((command, idx) => {
+          const isSelected = idx === selectedIndex;
+          return (
             <div
               key={`${command.actionId}-${idx}`}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                handleSelect(command);
-              }}
+              ref={(el) => { itemRefs.current[idx] = el; }}
+              onMouseEnter={() => setSelectedIndex(idx)}
+              onMouseDown={(e) => { e.preventDefault(); handleSelect(command); }}
               className={cn(
-                "flex items-center gap-3 px-3.5 py-2.5 my-1 text-sm text-white/90 rounded-xl cursor-pointer select-none transition-all",
-                "bg-white/[0.02] hover:bg-purple-600/30 hover:text-white active:scale-[0.98] hover:ring-1 hover:ring-purple-500/50"
+                "flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-100",
+                isSelected
+                  ? "bg-white text-black"
+                  : "text-white/70 hover:bg-white/6 hover:text-white"
               )}
             >
-              <div className="p-1.5 rounded-lg bg-white/10 text-white/80 shrink-0">
+              {/* Icon */}
+              <div
+                className={cn(
+                  "p-1.5 rounded-lg shrink-0 transition-colors",
+                  isSelected ? "bg-black/10 text-black" : "bg-white/8 text-white/50"
+                )}
+              >
                 {getIconForAction(command.actionId)}
               </div>
-              <span className="font-medium flex-1 truncate">{command.title}</span>
-              <span className="text-[11px] text-white/40 font-mono px-2 py-0.5 rounded bg-white/5 shrink-0">
-                Enter ↵
+
+              {/* Label */}
+              <span className="flex-1 text-sm font-medium truncate">
+                {command.title}
               </span>
+
+              {/* Hint */}
+              <kbd
+                className={cn(
+                  "text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0 transition-colors",
+                  isSelected
+                    ? "border-black/20 bg-black/10 text-black/60"
+                    : "border-white/10 bg-white/4 text-white/25"
+                )}
+              >
+                ↵
+              </kbd>
             </div>
-          ))}
-        </Command.List>
-      </Command>
+          );
+        })}
+      </div>
+
+      {/* ── Footer ─────────────────────────────────────────── */}
+      <div className="px-4 py-2 border-t border-white/6 flex items-center gap-4 shrink-0">
+        <span className="text-[10px] text-white/20 font-mono">↑↓ navigate</span>
+        <span className="text-[10px] text-white/20 font-mono">↵ select</span>
+        <span className="text-[10px] text-white/20 font-mono ml-auto">esc close</span>
+      </div>
     </div>
   );
 };

@@ -125,7 +125,7 @@ pub fn shutdown_pc() -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         std::process::Command::new("shutdown")
-            .args(["/s", "/t", "0"])
+            .args(["/s", "/f", "/t", "0"])
             .spawn()
             .map_err(|e| format!("Failed to shutdown PC: {}", e))?;
         Ok(())

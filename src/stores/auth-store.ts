@@ -4,6 +4,35 @@ import { supabase } from "@/lib/supabase";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 
+// ---------------------------------------------------------------------------
+// Offline-first: synchronously read the cached Supabase session from
+// localStorage so the app renders immediately without waiting for the network.
+// ---------------------------------------------------------------------------
+function readCachedSession(): { session: Session | null; user: User | null } {
+  try {
+    // Supabase v2 stores its session under a key like
+    // "sb-<project-ref>-auth-token" in localStorage.
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("sb-") && key.endsWith("-auth-token")) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const session: Session = parsed;
+          if (session?.access_token && session?.user) {
+            return { session, user: session.user };
+          }
+        }
+      }
+    }
+  } catch (_) {
+    // Ignore parse errors — will fall back to full network init
+  }
+  return { session: null, user: null };
+}
+
+const _cached = readCachedSession();
+
 export interface Profile {
   id: string;
   username: string;
@@ -26,10 +55,12 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  session: null,
-  user: null,
+  // Pre-hydrate from the cache: if we have a session already, skip the
+  // loading spinner entirely so the app shows instantly (even offline).
+  session: _cached.session,
+  user: _cached.user,
   profile: null,
-  isLoading: true,
+  isLoading: _cached.session === null, // Only show spinner if truly no session
 
   fetchProfile: async (userId: string) => {
     const { data, error } = await supabase
@@ -46,13 +77,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   initialize: () => {
+    // If we already have a cached session, fetch the profile in background
+    // without blocking the UI.
+    if (_cached.session?.user) {
+      get().fetchProfile(_cached.session.user.id).catch(() => {});
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        set({ session, user: session.user });
-        get().fetchProfile(session.user.id).then(() => set({ isLoading: false }));
+        set({ session, user: session.user, isLoading: false });
+        get().fetchProfile(session.user.id).catch(() => {});
       } else {
-        set({ session: null, user: null, isLoading: false });
+        // No valid session from the server — clear any stale cached data
+        set({ session: null, user: null, profile: null, isLoading: false });
       }
+    }).catch(() => {
+      // Network error (offline) — keep cached session active, clear spinner
+      set({ isLoading: false });
     });
 
     supabase.auth.onAuthStateChange(async (_event, session) => {

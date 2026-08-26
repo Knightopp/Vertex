@@ -60,27 +60,45 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
                     return BOOL::from(true);
                 }
 
-                if let Some(exe_path) = get_process_path(pid) {
-                    let path_lower = exe_path.to_lowercase();
-                    // Ignore Windows system apps and UWP background apps
-                    if path_lower.contains("c:\\windows\\")
-                        || path_lower.contains("windowsapps")
-                        || path_lower.contains("systemapps")
-                    {
-                        return BOOL::from(true);
-                    }
+                    let file_name = std::path::Path::new(&exe_path)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default()
+                        .to_lowercase();
 
                     let title = get_window_title(hwnd);
-                    let title_lower = title.to_lowercase();
+                    let title_lower = title.trim().to_lowercase();
 
-                    // Filter out background noise: actual user-facing apps always have a window title
-                    // Also filter out common invisible helper windows that somehow get marked as visible
-                    if !title.is_empty()
-                        && !title_lower.contains("webhelper")
-                        && !title_lower.contains("crashpad")
-                        && title != "default ime"
-                        && title != "msctfime ui"
-                    {
+                    // Filter out background noise and system host processes
+                    let is_background = file_name == "searchhost.exe"
+                        || file_name == "shellexperiencehost.exe"
+                        || file_name == "startmenuexperiencehost.exe"
+                        || file_name == "lockapp.exe"
+                        || file_name == "textinputhost.exe"
+                        || file_name == "dwm.exe"
+                        || file_name == "sihost.exe"
+                        || file_name == "taskhostw.exe"
+                        || file_name == "ctfmon.exe"
+                        || file_name == "runtimebroker.exe"
+                        || file_name == "widgets.exe"
+                        || file_name == "searchapp.exe"
+                        || file_name == "backgroundtaskhost.exe"
+                        || file_name == "fontdrvhost.exe"
+                        || file_name == "smartscreen.exe"
+                        || file_name == "securityhealthsystray.exe"
+                        || file_name == "compattelrunner.exe"
+                        || file_name == "conhost.exe"
+                        || (file_name == "applicationframehost.exe" && (title_lower.is_empty() || title_lower == "application frame host"))
+                        || title_lower.is_empty()
+                        || title_lower == "program manager"
+                        || title_lower == "windows input experience"
+                        || title_lower == "default ime"
+                        || title_lower == "msctfime ui"
+                        || title_lower == "media context notification"
+                        || title_lower.contains("webhelper")
+                        || title_lower.contains("crashpad");
+
+                    if !is_background {
                         let proc_info = WindowProcessInfo {
                             pid,
                             exe_path,

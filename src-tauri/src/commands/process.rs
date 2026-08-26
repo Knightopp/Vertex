@@ -321,17 +321,44 @@ pub fn move_window(pid: u32, x: i32, y: i32, width: i32, height: i32) -> Result<
 pub fn close_window(pid: u32) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        use windows::Win32::UI::WindowsAndMessaging::{PostMessageW, WM_CLOSE};
-        use crate::window_enum::get_top_level_processes;
-        let windows = get_top_level_processes();
-        if let Some(w) = windows.into_iter().find(|w| w.pid == pid) {
-            unsafe {
-                let hwnd = windows::Win32::Foundation::HWND(w.hwnd as _);
-                let _ = PostMessageW(hwnd, WM_CLOSE, windows::Win32::Foundation::WPARAM(0), windows::Win32::Foundation::LPARAM(0));
-            }
-            return Ok(());
+        use windows::Win32::Foundation::{BOOL, HWND, LPARAM, WPARAM};
+        use windows::Win32::UI::WindowsAndMessaging::{
+            EnumWindows, GetWindowThreadProcessId, PostMessageW, SC_CLOSE, WM_CLOSE, WM_SYSCOMMAND,
+        };
+
+        struct EnumData {
+            target_pid: u32,
+            found: bool,
         }
-        Err("Window not found".into())
+
+        unsafe extern "system" fn close_enum_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
+            let data = &mut *(lparam.0 as *mut EnumData);
+            let mut w_pid = 0;
+            GetWindowThreadProcessId(hwnd, Some(&mut w_pid));
+            if w_pid == data.target_pid {
+                data.found = true;
+                let _ = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+                let _ = PostMessageW(hwnd, WM_SYSCOMMAND, WPARAM(SC_CLOSE as _), LPARAM(0));
+            }
+            BOOL::from(true)
+        }
+
+        let mut data = EnumData {
+            target_pid: pid,
+            found: false,
+        };
+
+        unsafe {
+            let _ = EnumWindows(Some(close_enum_proc), LPARAM(&mut data as *mut _ as isize));
+        }
+
+        // Always follow through with taskkill /PID (graceful, no /F).
+        // This handles apps like Spotify that silently ignore WM_CLOSE.
+        let _ = std::process::Command::new("taskkill")
+            .args(["/PID", &pid.to_string()])
+            .status();
+
+        return Ok(());
     }
     #[cfg(not(target_os = "windows"))]
     {
@@ -345,9 +372,16 @@ pub fn force_close_process(pid: u32) -> Result<(), String> {
     {
         use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
         unsafe {
-            let handle = OpenProcess(PROCESS_TERMINATE, false, pid).map_err(|e| format!("Failed to open process: {}", e))?;
-            TerminateProcess(handle, 1).map_err(|e| format!("Failed to terminate process: {}", e))?;
+            if let Ok(handle) = OpenProcess(PROCESS_TERMINATE, false, pid) {
+                if TerminateProcess(handle, 1).is_ok() {
+                    return Ok(());
+                }
+            }
         }
+        // Fallback to taskkill /F /T
+        let _ = std::process::Command::new("taskkill")
+            .args(["/F", "/T", "/PID", &pid.to_string()])
+            .status();
         Ok(())
     }
     #[cfg(not(target_os = "windows"))]

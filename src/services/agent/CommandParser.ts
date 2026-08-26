@@ -71,7 +71,7 @@ export class CommandParser {
     const dynamicResults: ParsedCommand[] = [];
     
     // 0. Quick keyboard power shortcuts
-    if (lowerText === 'sh' || lowerText === 'qwe') {
+    if (lowerText === 'sh' || lowerText === 'qwe' || lowerText === 'shutdown' || lowerText === 'shut down') {
       return [{
         title: "Shutdown PC",
         actionId: "shutdown",
@@ -80,7 +80,7 @@ export class CommandParser {
         score: -2
       }];
     }
-    if (lowerText === 'sl') {
+    if (lowerText === 'sl' || lowerText === 'sleep') {
       return [{
         title: "Sleep PC",
         actionId: "sleep",
@@ -89,13 +89,46 @@ export class CommandParser {
         score: -2
       }];
     }
+    if (lowerText === 'close all' || lowerText === 'close all apps' || lowerText === 'kill all' || lowerText === 'quit all' || lowerText === 'close everything') {
+      return [{
+        title: "Close All Applications",
+        actionId: "close_all_apps",
+        parameters: {},
+        originalText: text,
+        score: -2
+      }];
+    }
 
-    // 1. Custom URL or domain (e.g. "hello.com", "open reddit.com/r/gaming", "https://xyz.org")
+    // 1. Dynamic "Close <app>" matcher
+    const closeAppMatch = lowerText.match(/^(?:close|kill|quit|exit|stop)\s+(.+)$/i);
+    if (closeAppMatch) {
+      const targetApp = closeAppMatch[1].trim();
+      if (targetApp === "all" || targetApp === "all apps" || targetApp === "everything") {
+        dynamicResults.push({
+          title: "Close All Applications",
+          actionId: "close_all_apps",
+          parameters: {},
+          originalText: text,
+          score: -1.5
+        });
+      } else {
+        const capitalized = targetApp.charAt(0).toUpperCase() + targetApp.slice(1);
+        dynamicResults.push({
+          title: `Close ${capitalized}`,
+          actionId: 'close_app',
+          parameters: { appName: capitalized },
+          originalText: text,
+          score: -0.9
+        });
+      }
+    }
+
+    // 2. Custom URL or domain (e.g. "hello.com", "open reddit.com/r/gaming", "https://xyz.org")
     const cleanUrlQuery = lowerText.replace(/^(?:open|go\s+to|visit|launch)\s+/i, '').trim();
     const urlPattern = /^(?:https?:\/\/)?([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}(?:\/[^\s]*)?)$/i;
     const urlMatch = cleanUrlQuery.match(urlPattern);
 
-    if (urlMatch) {
+    if (urlMatch && !closeAppMatch) {
       const rawDomain = urlMatch[1];
       const targetUrl = cleanUrlQuery.startsWith('http://') || cleanUrlQuery.startsWith('https://') 
         ? cleanUrlQuery 
@@ -110,7 +143,7 @@ export class CommandParser {
       });
     }
 
-    // 2. Dynamic volume matcher
+    // 3. Dynamic volume matcher
     const volMatch = lowerText.match(/^v(?:olume)?\s+(\d+)$/);
     if (volMatch) {
       dynamicResults.push({
@@ -122,9 +155,9 @@ export class CommandParser {
       });
     }
 
-    // 3. Dynamic "Open <app>" fallback if user types an app name
+    // 4. Dynamic "Open <app>" fallback if user types an app name
     const openAppMatch = lowerText.match(/^(?:open|launch|start)\s+(.+)$/i);
-    if (openAppMatch && !urlMatch) {
+    if (openAppMatch && !urlMatch && !closeAppMatch) {
       const targetApp = openAppMatch[1].trim();
       const capitalized = targetApp.charAt(0).toUpperCase() + targetApp.slice(1);
       dynamicResults.push({
@@ -188,6 +221,12 @@ export class CommandParser {
         parameters: { appName: app.name, path: app.path },
         searchTerms: [`open ${app.name.toLowerCase()}`, `launch ${app.name.toLowerCase()}`, app.name.toLowerCase()]
       });
+      templates.push({
+        title: `Close ${app.name}`,
+        actionId: 'close_app',
+        parameters: { appName: app.name },
+        searchTerms: [`close ${app.name.toLowerCase()}`, `kill ${app.name.toLowerCase()}`, `quit ${app.name.toLowerCase()}`]
+      });
     }
 
     // 3. Common Desktop Applications
@@ -197,6 +236,18 @@ export class CommandParser {
         actionId: 'launch_app',
         parameters: { appName: app.name },
         searchTerms: app.searchTerms
+      });
+      templates.push({
+        title: `Close ${app.name}`,
+        actionId: 'close_app',
+        parameters: { appName: app.name },
+        searchTerms: [
+          `close ${app.name.toLowerCase()}`,
+          `kill ${app.name.toLowerCase()}`,
+          `quit ${app.name.toLowerCase()}`,
+          `exit ${app.name.toLowerCase()}`,
+          `stop ${app.name.toLowerCase()}`
+        ]
       });
     }
 
@@ -211,7 +262,7 @@ export class CommandParser {
       });
     }
 
-    // 5. Websites
+    // 5. Websites & Web Apps (YouTube, Twitch, Netflix, etc.)
     for (const site of this.websiteAliases) {
       templates.push({
         title: `Open ${site.name}`,
@@ -219,9 +270,33 @@ export class CommandParser {
         parameters: { url: site.url },
         searchTerms: [`open ${site.alias}`, `open ${site.name}`, site.alias, site.name, `go to ${site.name}`]
       });
+      templates.push({
+        title: `Close ${site.name}`,
+        actionId: 'close_app',
+        parameters: { appName: site.name },
+        searchTerms: [`close ${site.alias}`, `close ${site.name}`, `kill ${site.name}`, `quit ${site.name}`]
+      });
     }
 
-    // 6. System / Power / Window Commands
+    // 6. Image & Photo Viewer actions
+    templates.push({
+      title: "Close Photos / Images",
+      actionId: "close_app",
+      parameters: { appName: "Photos" },
+      searchTerms: [
+        "close images",
+        "close image",
+        "close photos",
+        "close photo",
+        "close picture",
+        "close pictures",
+        "kill photos",
+        "kill images",
+        "quit photos"
+      ]
+    });
+
+    // 7. System / Power / Window Commands
     templates.push(
       {
         title: "Take Screenshot",
@@ -233,13 +308,13 @@ export class CommandParser {
         title: "Close All Applications",
         actionId: "close_all_apps",
         parameters: {},
-        searchTerms: ["close all", "close all apps", "kill all", "quit all", "close everything", "exit all"]
+        searchTerms: ["close all", "close all apps", "kill all", "quit all", "close everything", "exit all", "close windows"]
       },
       {
         title: "Shutdown PC",
         actionId: "shutdown",
         parameters: {},
-        searchTerms: ["sh", "qwe", "shutdown", "shut down", "turn off", "power off", "shutdown pc"]
+        searchTerms: ["sh", "qwe", "shutdown", "shut down", "turn off", "power off", "shutdown pc", "turn off pc"]
       },
       {
         title: "Sleep PC",

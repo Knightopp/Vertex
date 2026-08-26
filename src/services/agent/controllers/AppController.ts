@@ -90,6 +90,98 @@ export class AppController {
       }
     });
 
+function findMatchingProcesses(
+  appName: string,
+  running: import("../../../lib/tauri-ipc").ProcessInfo[],
+  entries: any[] = []
+): import("../../../lib/tauri-ipc").ProcessInfo[] {
+  const query = String(appName).trim().toLowerCase();
+  if (!query) return [];
+
+  // Filter out Vertex itself
+  const validRunning = running.filter(r => {
+    const name = r.name.toLowerCase();
+    const title = r.windowTitle.toLowerCase();
+    return name !== "vertex.exe" && name !== "vazorism.exe" && !title.includes("vertex") && !title.includes("vazorism");
+  });
+
+  // 1. YouTube specific alias: match any window with "youtube" in title
+  if (query === "youtube" || query === "yt") {
+    const ytWindows = validRunning.filter(r => r.windowTitle.toLowerCase().includes("youtube"));
+    if (ytWindows.length > 0) return ytWindows;
+  }
+
+  // 2. Images / Photos specific alias: match Photos app, Paint, or windows displaying image files
+  if (query === "images" || query === "image" || query === "photos" || query === "photo" || query === "picture" || query === "pictures") {
+    const imageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".ico", ".tiff", ".raw"];
+    const imageProcesses = validRunning.filter(r => {
+      const name = r.name.toLowerCase();
+      const title = r.windowTitle.toLowerCase();
+      // Direct photo app names
+      const isPhotoApp = name.includes("photo") || name === "mspaint.exe" || name.includes("imageglass") || name.includes("irfanview") || name === "microsoft.photos.exe";
+      // UWP Photos runs inside ApplicationFrameHost — match by window title
+      const isUwpPhotoHost = name === "applicationframehost.exe" && (title.includes("photos") || title.includes("photo"));
+      const hasPhotoTitle = title.includes("photos") || title.includes("photo") || title.includes("image viewer") || title.includes("paint");
+      const hasImageExt = imageExtensions.some(ext => title.includes(ext));
+      return isPhotoApp || isUwpPhotoHost || hasPhotoTitle || hasImageExt;
+    });
+    if (imageProcesses.length > 0) return imageProcesses;
+  }
+
+  // 3. Known app aliases mapping
+  const aliasMap: Record<string, string[]> = {
+    spotify: ["spotify.exe", "spotify"],
+    discord: ["discord.exe", "discord"],
+    steam: ["steam.exe", "steam"],
+    chrome: ["chrome.exe", "google chrome"],
+    edge: ["msedge.exe", "microsoft edge", "edge"],
+    notepad: ["notepad.exe", "notepad"],
+    calc: ["calculatorapp.exe", "calc.exe", "calculator"],
+    calculator: ["calculatorapp.exe", "calc.exe", "calculator"],
+    vscode: ["code.exe", "visual studio code"],
+    code: ["code.exe", "visual studio code"],
+  };
+
+  const aliases = aliasMap[query];
+  if (aliases) {
+    const matched = validRunning.filter(r => {
+      const name = r.name.toLowerCase();
+      const title = r.windowTitle.toLowerCase();
+      const prod = (r.productName || "").toLowerCase();
+      return aliases.some(a => name.includes(a) || title.includes(a) || prod.includes(a));
+    });
+    if (matched.length > 0) return matched;
+  }
+
+  // 4. Library Entry matching
+  const entry = entries.find(e =>
+    e.title.toLowerCase() === query ||
+    e.executableName?.toLowerCase() === query ||
+    e.title.toLowerCase().includes(query)
+  );
+  if (entry && entry.executablePath) {
+    const entryExe = entry.executablePath.toLowerCase();
+    const matched = validRunning.filter(r => r.exePath?.toLowerCase() === entryExe || (r.name && entryExe.endsWith(r.name.toLowerCase())));
+    if (matched.length > 0) return matched;
+  }
+
+  // 5. General matching across all running processes
+  const matched = validRunning.filter(r => {
+    const name = r.name.toLowerCase();
+    const title = r.windowTitle.toLowerCase();
+    const prod = (r.productName || "").toLowerCase();
+    const desc = (r.fileDescription || "").toLowerCase();
+    return (
+      name.includes(query) ||
+      title.includes(query) ||
+      prod.includes(query) ||
+      desc.includes(query)
+    );
+  });
+
+  return matched;
+}
+
     actionRegistry.register({
       id: "close_app",
       name: "Close Application",
@@ -106,17 +198,22 @@ export class AppController {
       handler: async (params) => {
         const { appName } = params;
         const entries = await libraryManager.getAllEntries();
-        const entry = entries.find(e => e.title.toLowerCase() === String(appName).toLowerCase());
-        
-        if (!entry || !entry.executablePath) throw new Error(`Application "${appName}" not found.`);
-        
         const running = await getRunningProcesses();
-        const runningInstance = running.find(r => r.exePath?.toLowerCase() === entry.executablePath?.toLowerCase());
         
-        if (!runningInstance) throw new Error(`Application "${appName}" is not currently running.`);
+        const targets = findMatchingProcesses(appName, running, entries);
         
-        console.log(`[AppController] Safely closing app: ${appName} (PID: ${runningInstance.pid})`);
-        await closeWindow(runningInstance.pid);
+        if (targets.length === 0) {
+          throw new Error(`No running application or window matching "${appName}" was found.`);
+        }
+        
+        console.log(`[AppController] Safely closing ${targets.length} instance(s) of "${appName}"`);
+        for (const target of targets) {
+          try {
+            await closeWindow(target.pid);
+          } catch (err) {
+            console.warn(`[AppController] Failed to close PID ${target.pid}:`, err);
+          }
+        }
       }
     });
 
@@ -137,17 +234,22 @@ export class AppController {
       handler: async (params) => {
         const { appName } = params;
         const entries = await libraryManager.getAllEntries();
-        const entry = entries.find(e => e.title.toLowerCase() === String(appName).toLowerCase());
-        
-        if (!entry || !entry.executablePath) throw new Error(`Application "${appName}" not found.`);
-        
         const running = await getRunningProcesses();
-        const runningInstance = running.find(r => r.exePath?.toLowerCase() === entry.executablePath?.toLowerCase());
         
-        if (!runningInstance) throw new Error(`Application "${appName}" is not currently running.`);
+        const targets = findMatchingProcesses(appName, running, entries);
         
-        console.log(`[AppController] Force closing app: ${appName} (PID: ${runningInstance.pid})`);
-        await forceCloseProcess(runningInstance.pid);
+        if (targets.length === 0) {
+          throw new Error(`No running application or window matching "${appName}" was found.`);
+        }
+        
+        console.log(`[AppController] Force closing ${targets.length} instance(s) of "${appName}"`);
+        for (const target of targets) {
+          try {
+            await forceCloseProcess(target.pid);
+          } catch (err) {
+            console.warn(`[AppController] Failed to force close PID ${target.pid}:`, err);
+          }
+        }
       }
     });
 

@@ -120,7 +120,7 @@ syncManager.init();
 import SetupProfile from "@/components/auth/SetupProfile";
 
 const AuthGuard = ({ children }: { children: React.ReactNode }) => {
-  const { session, profile, isLoading } = useAuthStore();
+  const { session, profile, user, isLoading } = useAuthStore();
 
   useEffect(() => {
     if (session && profile?.setup_complete) {
@@ -129,7 +129,32 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
       // Only run process polling on PC
       if (type() !== "android" && type() !== "ios") {
         processManager.startPolling();
-        agentCore.init().catch(console.error);
+        agentCore.init().then(() => {
+          // Fire a welcome greeting immediately after agent is ready.
+          // This uses cached credentials so it works fully offline.
+          const hour = new Date().getHours();
+          const greeting =
+            hour < 12 ? "Good morning" :
+            hour < 18 ? "Good afternoon" : "Good evening";
+          const name = profile?.username || user?.user_metadata?.full_name || "";
+          const body = name ? `${greeting}, ${name}.` : `${greeting}.`;
+
+          const fireNotif = () => {
+            try {
+              new Notification("Vertex", { body, silent: true });
+            } catch (_) {}
+          };
+
+          if ("Notification" in window) {
+            if (Notification.permission === "granted") {
+              fireNotif();
+            } else if (Notification.permission !== "denied") {
+              Notification.requestPermission().then((perm) => {
+                if (perm === "granted") fireNotif();
+              });
+            }
+          }
+        }).catch(console.error);
       }
     }
   }, [session, profile?.setup_complete]);

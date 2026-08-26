@@ -1,5 +1,5 @@
 import { actionRegistry } from "../ActionRegistry";
-import { lockPc, setVolume, muteVolume, takeScreenshot, startRecording, stopRecording } from "../../../lib/tauri-ipc";
+import { lockPc, shutdownPc, sleepPc, setVolume, muteVolume, takeScreenshot, startRecording, stopRecording } from "../../../lib/tauri-ipc";
 
 export class SystemController {
   init() {
@@ -7,7 +7,6 @@ export class SystemController {
       console.log(`[SystemController] Taking screenshot...`);
       const path = await takeScreenshot();
       console.log(`[SystemController] Screenshot saved to ${path}`);
-      return path;
     };
 
     actionRegistry.register({
@@ -96,17 +95,41 @@ export class SystemController {
       parameters: [],
       handler: async () => {
         console.log(`[SystemController] Closing all user application windows...`);
-        const { getRunningProcesses, closeWindow } = await import("../../../lib/tauri-ipc");
-        const running = await getRunningProcesses();
-        for (const proc of running) {
-          // Avoid closing Windows explorer or self
-          const lowerName = proc.name.toLowerCase();
-          if (lowerName !== "explorer.exe" && lowerName !== "vertex.exe" && lowerName !== "vazorism.exe") {
-            try {
-              await closeWindow(proc.pid);
-            } catch (_) {}
-          }
+        const { getRunningProcesses, closeWindow, forceCloseProcess } = await import("../../../lib/tauri-ipc");
+
+        // Processes that must never be touched
+        const SYSTEM_EXCLUSIONS = new Set([
+          "explorer.exe", "vertex.exe", "vazorism.exe",
+          "applicationframehost.exe", "sihost.exe", "dwm.exe",
+          "svchost.exe", "csrss.exe", "winlogon.exe", "lsass.exe",
+          "smss.exe", "wininit.exe", "services.exe", "taskhostw.exe",
+          "runtimebroker.exe", "searchindexer.exe", "searchhost.exe",
+          "startmenuexperiencehost.exe", "shellexperiencehost.exe",
+          "systemsettings.exe", "textinputhost.exe", "ctfmon.exe",
+          "fontdrvhost.exe", "spoolsv.exe",
+        ]);
+
+        const isSystem = (name: string) => SYSTEM_EXCLUSIONS.has(name.toLowerCase());
+        const isVertex = (title: string) =>
+          title.toLowerCase().includes("vertex") || title.toLowerCase().includes("vazorism");
+
+        // Pass 1: graceful close
+        const running1 = await getRunningProcesses();
+        const targets1 = running1.filter((p) => !isSystem(p.name) && !isVertex(p.windowTitle));
+        console.log(`[SystemController] Pass 1: graceful close for ${targets1.length} process(es)...`);
+        await Promise.allSettled(targets1.map((p) => closeWindow(p.pid)));
+
+        // Wait 1.5 s for apps to finish closing
+        await new Promise((r) => setTimeout(r, 1500));
+
+        // Pass 2: force-kill anything still alive
+        const running2 = await getRunningProcesses();
+        const targets2 = running2.filter((p) => !isSystem(p.name) && !isVertex(p.windowTitle));
+        if (targets2.length > 0) {
+          console.log(`[SystemController] Pass 2: force-kill ${targets2.length} stubborn process(es)...`);
+          await Promise.allSettled(targets2.map((p) => forceCloseProcess(p.pid)));
         }
+        console.log(`[SystemController] Close all complete.`);
       }
     });
 
