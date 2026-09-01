@@ -15,7 +15,23 @@ export type AppSettings = {
   agentGlobalShortcut: string;
   agentScreenshotDir: string;
   agentRecordingDir: string;
+  excludedApps: string[];
 };
+
+export const DEFAULT_EXCLUDED_APPS = [
+  "wallpaper32.exe",
+  "wallpaper64.exe",
+  "wallpaper engine",
+  "update-check.exe",
+  "update-check",
+  "crashpad_handler.exe",
+  "steamwebhelper.exe",
+  "epicwebhelper.exe",
+  "nvcontainer.exe",
+  "nvidia share.exe",
+  "rtss.exe",
+  "msiafterburner.exe"
+];
 
 const DEFAULT_SETTINGS: AppSettings = {
   accentColor: "#8b5cf6", // Violet 500
@@ -32,6 +48,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   agentGlobalShortcut: "Ctrl+Alt+Space",
   agentScreenshotDir: "",
   agentRecordingDir: "",
+  excludedApps: DEFAULT_EXCLUDED_APPS,
 };
 
 import { useAuthStore } from "../stores/auth-store";

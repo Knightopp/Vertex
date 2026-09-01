@@ -131,8 +131,15 @@ pub fn run() {
                                         // Get cursor position and clamp window within screen bounds
                                         #[cfg(target_os = "windows")]
                                         {
-                                            use windows::Win32::Foundation::POINT;
-                                            use windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
+                                            use windows::Win32::Foundation::{HWND, POINT};
+                                            use windows::Win32::UI::WindowsAndMessaging::{
+                                                GetCursorPos, GetSystemMetrics, GetForegroundWindow, GetWindowThreadProcessId,
+                                                SetWindowPos, SetForegroundWindow, BringWindowToTop,
+                                                HWND_TOPMOST, SWP_SHOWWINDOW,
+                                                SM_CXSCREEN, SM_CYSCREEN
+                                            };
+                                            use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+
                                             let mut pt = POINT { x: 0, y: 0 };
                                             unsafe { 
                                                 let _ = GetCursorPos(&mut pt); 
@@ -146,11 +153,37 @@ pub fn run() {
                                                 let target_y = (pt.y - 30).max(16).min(screen_h - win_h - 16);
 
                                                 let _ = cmd_win.set_position(tauri::PhysicalPosition::new(target_x, target_y));
+                                                let _ = cmd_win.show();
+                                                let _ = cmd_win.set_always_on_top(true);
+                                                let _ = cmd_win.set_focus();
+
+                                                if let Ok(hwnd_raw) = cmd_win.hwnd() {
+                                                    let target_hwnd = HWND(hwnd_raw.0 as _);
+                                                    let fg_hwnd = GetForegroundWindow();
+                                                    let mut fg_pid = 0;
+                                                    let fg_thread = GetWindowThreadProcessId(fg_hwnd, Some(&mut fg_pid));
+                                                    let current_thread = GetCurrentThreadId();
+
+                                                    if fg_thread != current_thread && fg_thread != 0 {
+                                                        let _ = AttachThreadInput(current_thread, fg_thread, true);
+                                                        let _ = SetWindowPos(target_hwnd, HWND_TOPMOST, target_x, target_y, win_w, win_h, SWP_SHOWWINDOW);
+                                                        let _ = BringWindowToTop(target_hwnd);
+                                                        let _ = SetForegroundWindow(target_hwnd);
+                                                        let _ = AttachThreadInput(current_thread, fg_thread, false);
+                                                    } else {
+                                                        let _ = SetWindowPos(target_hwnd, HWND_TOPMOST, target_x, target_y, win_w, win_h, SWP_SHOWWINDOW);
+                                                        let _ = BringWindowToTop(target_hwnd);
+                                                        let _ = SetForegroundWindow(target_hwnd);
+                                                    }
+                                                }
                                             }
                                         }
-                                        let _ = cmd_win.show();
-                                        let _ = cmd_win.set_always_on_top(true);
-                                        let _ = cmd_win.set_focus();
+                                        #[cfg(not(target_os = "windows"))]
+                                        {
+                                            let _ = cmd_win.show();
+                                            let _ = cmd_win.set_always_on_top(true);
+                                            let _ = cmd_win.set_focus();
+                                        }
                                     }
                                 } else {
                                     // Fallback: toggle command bar inside main window

@@ -3,7 +3,7 @@ import Layout from "@/components/layout/Layout";
 import SectionHeading from "@/components/common/SectionHeading";
 import { useSettingsStore } from "@/stores/settings-store";
 import { motion } from "framer-motion";
-import { FolderPlus, Trash2, CheckCircle2, Circle } from "lucide-react";
+import { FolderPlus, Trash2, CheckCircle2, Circle, Ban, RotateCw, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { steamSyncManager } from "@/services/SteamSyncManager";
@@ -24,6 +24,8 @@ export default function Settings() {
   const [appVersion, setAppVersion] = useState("1.0.0");
   const [activeTab, setActiveTab] = useState<"general" | "library" | "metadata" | "integrations" | "presets">("general");
   const [newScanPath, setNewScanPath] = useState("");
+  const [newExcludedApp, setNewExcludedApp] = useState("");
+  const [isDeduplicating, setIsDeduplicating] = useState(false);
   const [isSyncingSteam, setIsSyncingSteam] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
   const [editUsername, setEditUsername] = useState(profile?.username || "");
@@ -165,6 +167,45 @@ export default function Settings() {
       toast.error(`Migration failed: ${err.toString()}`);
     } finally {
       setIsMigrating(false);
+    }
+  };
+
+  const handleAddExcludedApp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = newExcludedApp.trim().toLowerCase();
+    if (!clean) return;
+
+    const current = [...(settings.excludedApps || [])];
+    if (current.some(x => x.toLowerCase() === clean)) {
+      toast.info("This application is already excluded.");
+      return;
+    }
+
+    current.push(clean);
+    await updateSettings({ excludedApps: current });
+    await libraryManager.cleanupDuplicateEntries();
+    setNewExcludedApp("");
+    toast.success(`Added "${clean}" to exclusion list.`);
+  };
+
+  const handleRemoveExcludedApp = async (appToRemove: string) => {
+    await libraryManager.unexcludeApp(appToRemove);
+    toast.success(`Removed "${appToRemove}" from exclusions.`);
+  };
+
+  const handleRunDeduplication = async () => {
+    setIsDeduplicating(true);
+    try {
+      const count = await libraryManager.cleanupDuplicateEntries();
+      if (count > 0) {
+        toast.success(`Cleaned and merged ${count} duplicate entries!`);
+      } else {
+        toast.info("No duplicates found. Your library is clean!");
+      }
+    } catch (e: any) {
+      toast.error(`Cleanup failed: ${e.toString()}`);
+    } finally {
+      setIsDeduplicating(false);
     }
   };
 
@@ -315,8 +356,8 @@ export default function Settings() {
                 <div className="mt-4 flex flex-col gap-4">
                   <label className="flex items-center justify-between p-4 rounded-2xl bg-black/20 border border-white/5 cursor-pointer hover:bg-black/30 transition-colors">
                     <div>
-                      <h4 className="font-bold text-white text-lg">Launch on Startup</h4>
-                      <p className="text-white/50 text-sm">Automatically open Vertex when your computer boots.</p>
+                      <h4 className="font-bold text-white text-lg">Launch on Startup (High Priority)</h4>
+                      <p className="text-white/50 text-sm">Automatically open Vertex instantly when your computer boots with 0s delay.</p>
                     </div>
                     <div className="relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black cursor-pointer" onClick={handleToggleAutoStart}>
                       <div className={cn("absolute inset-0 rounded-full transition-colors", settings.autoStart ? "bg-white" : "bg-white/10")} />
@@ -345,11 +386,11 @@ export default function Settings() {
                         type="text"
                         value={settings.agentGlobalShortcut || ""}
                         onChange={(e) => updateSettings({ agentGlobalShortcut: e.target.value })}
-                        placeholder="e.g. CommandOrControl+Alt+Space"
+                        placeholder="e.g. Ctrl+Alt+Space"
                         className="w-64 px-4 py-2 rounded-xl bg-black/40 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:border-white/50 text-sm"
                       />
                       <div className="flex gap-2 items-center mt-2">
-                        <p className="text-[10px] text-white/30 ml-1">Example: CommandOrControl+Alt+Space</p>
+                        <p className="text-[10px] text-white/30 ml-1">Example: Ctrl+Alt+Space</p>
                         <button 
                           onClick={async () => {
                             try {
@@ -412,6 +453,81 @@ export default function Settings() {
               animate={{ opacity: 1, y: 0 }}
               className="flex flex-col gap-8"
             >
+              {/* Library Maintenance & Deduplication */}
+              <section>
+                <SectionHeading title="Library Maintenance" />
+                <div className="mt-4 p-6 rounded-2xl bg-black/20 border border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <h4 className="font-bold text-white text-lg">Deduplicate Library</h4>
+                    <p className="text-white/50 text-sm mt-1">
+                      Scans your library for duplicate app entries (e.g. multiple Discords), combines their playtime, and cleans redundant cards.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleRunDeduplication}
+                    disabled={isDeduplicating}
+                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white hover:bg-white/90 text-black font-bold text-sm transition-colors shrink-0 disabled:opacity-50"
+                  >
+                    <RotateCw className={cn("w-4 h-4", isDeduplicating && "animate-spin")} />
+                    {isDeduplicating ? "Cleaning..." : "Clean Duplicates"}
+                  </button>
+                </div>
+              </section>
+
+              {/* Excluded Applications Filter */}
+              <section>
+                <div className="flex items-center justify-between mb-4">
+                  <SectionHeading title="Excluded Applications" />
+                </div>
+                <p className="text-white/50 text-sm mb-6 max-w-2xl">
+                  Processes and background applications listed here will never be tracked or added to your library (e.g. Wallpaper Engine).
+                </p>
+
+                <div className="flex flex-col gap-2 mb-6">
+                  {(!settings.excludedApps || settings.excludedApps.length === 0) ? (
+                    <div className="p-8 text-center rounded-2xl border border-dashed border-white/10 bg-black/10">
+                      <p className="text-white/40">No excluded applications configured.</p>
+                    </div>
+                  ) : (
+                    settings.excludedApps.map((appName) => (
+                      <div key={appName} className="flex items-center justify-between p-3.5 rounded-xl bg-black/40 border border-white/5">
+                        <div className="flex items-center gap-3">
+                          <Ban className="w-4 h-4 text-red-400 shrink-0" />
+                          <span className="font-mono text-sm text-white">{appName}</span>
+                        </div>
+                        <button 
+                          onClick={() => handleRemoveExcludedApp(appName)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/50 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                          title="Restore Tracking"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Restore
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <form onSubmit={handleAddExcludedApp} className="flex items-center gap-2">
+                  <input 
+                    type="text"
+                    placeholder="Enter executable name or title (e.g. wallpaper64.exe)"
+                    value={newExcludedApp}
+                    onChange={(e) => setNewExcludedApp(e.target.value)}
+                    className="flex-1 px-4 py-3 rounded-xl bg-black/40 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:border-white/50 text-sm"
+                  />
+                  <button 
+                    type="submit" 
+                    disabled={!newExcludedApp.trim()}
+                    className="flex items-center gap-2 px-6 py-3 bg-white text-black font-bold rounded-xl hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                  >
+                    <Ban className="w-4 h-4" />
+                    Exclude App
+                  </button>
+                </form>
+              </section>
+
+              {/* Scan Paths */}
               <section>
                 <div className="flex items-center justify-between mb-4">
                   <SectionHeading title="Scan Paths" />

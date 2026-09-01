@@ -88,29 +88,53 @@ pub fn set_autostart(enable: bool) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         use std::env;
+        use std::os::windows::process::CommandExt;
         use winreg::enums::*;
         use winreg::RegKey;
 
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let path = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 
-        let key = hkcu
-            .open_subkey_with_flags(path, KEY_SET_VALUE)
-            .map_err(|e| format!("Failed to open registry key: {}", e))?;
-
-        let app_name = "Vazorism";
+        let app_name = "Vertex";
+        let legacy_name = "Vazorism";
 
         if enable {
             let exe_path =
                 env::current_exe().map_err(|e| format!("Failed to get exe path: {}", e))?;
 
-            // Critical fix: wrap the path in double quotes and add --hidden
-            let value = format!("\"{}\" --hidden", exe_path.display());
+            // 1. Task Scheduler with 0s delay and HIGHEST runlevel for instant high-priority boot
+            let tr_arg = format!("\"{}\" --hidden", exe_path.display());
+            let _ = std::process::Command::new("schtasks")
+                .creation_flags(0x08000000)
+                .args([
+                    "/Create",
+                    "/TN", "VertexFastStartup",
+                    "/TR", &tr_arg,
+                    "/SC", "ONLOGON",
+                    "/RL", "HIGHEST",
+                    "/F",
+                    "/DELAY", "0000:00",
+                ])
+                .status();
 
-            key.set_value(app_name, &value)
-                .map_err(|e| format!("Failed to set registry value: {}", e))?;
+            // 2. Registry fallback
+            if let Ok(key) = hkcu.open_subkey_with_flags(path, KEY_SET_VALUE) {
+                let value = format!("\"{}\" --hidden", exe_path.display());
+                let _ = key.set_value(app_name, &value);
+                let _ = key.delete_value(legacy_name);
+            }
         } else {
-            let _ = key.delete_value(app_name); // Ignore error if it doesn't exist
+            // Remove Task Scheduler task
+            let _ = std::process::Command::new("schtasks")
+                .creation_flags(0x08000000)
+                .args(["/Delete", "/TN", "VertexFastStartup", "/F"])
+                .status();
+
+            // Remove Registry entries
+            if let Ok(key) = hkcu.open_subkey_with_flags(path, KEY_SET_VALUE) {
+                let _ = key.delete_value(app_name);
+                let _ = key.delete_value(legacy_name);
+            }
         }
 
         Ok(())

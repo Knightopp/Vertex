@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { LibraryEntryWithRelations, libraryManager } from "@/services/LibraryManager";
 import { imageManager } from "@/services/ImageManager";
 import { format } from "date-fns";
-import { X, Play, Clock, Calendar, Building2, Star, Edit3, Check, Trash2, FolderPlus, Tag, Heart, RefreshCw } from "lucide-react";
+import { X, Play, Clock, Calendar, Building2, Star, Edit3, Check, Trash2, FolderPlus, Tag, Heart, RefreshCw, Ban } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTrackingStore } from "@/stores/tracking-store";
 import { toast } from "sonner";
@@ -185,6 +185,19 @@ export default function GameDetailModal({ entry, isOpen, onClose }: GameDetailMo
                   title="Reload Metadata"
                 >
                   <RefreshCw className="w-5 h-5" />
+                </button>
+                <button 
+                  onClick={async () => {
+                    if (window.confirm(`Exclude "${title}"? Vertex will stop tracking this process and remove it from your library.`)) {
+                      await libraryManager.excludeApp(entry.id);
+                      toast.success(`Excluded ${title}`);
+                      onClose();
+                    }
+                  }}
+                  className="p-2 rounded-full bg-black/40 text-white/70 hover:text-red-400 hover:bg-black/60 transition-colors backdrop-blur-md"
+                  title="Exclude & Never Track"
+                >
+                  <Ban className="w-5 h-5" />
                 </button>
                 <button 
                   onClick={async () => {

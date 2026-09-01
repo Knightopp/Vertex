@@ -11,8 +11,9 @@ export class ProcessManager {
   async startPolling(intervalMs: number = 3000): Promise<void> {
     if (this.pollingInterval) return;
 
-    // 0. Wipe all ghost running states on startup to fix stuck games
+    // 0. Wipe all ghost running states on startup to fix stuck games and run deduplication cleanup
     try {
+      await libraryManager.cleanupDuplicateEntries();
       const entries = await libraryManager.getAllEntries();
       for (const entry of entries) {
         if (entry.isRunning) {
@@ -20,7 +21,7 @@ export class ProcessManager {
         }
       }
     } catch (e) {
-      console.error("[ProcessManager] Failed to wipe ghost states", e);
+      console.error("[ProcessManager] Failed to wipe ghost states / deduplicate", e);
     }
 
     this.poll();
@@ -82,14 +83,44 @@ export class ProcessManager {
         return; // Ignore tracking ourselves
       }
 
-      // Deduplicate: See if we already have this in Library via Hash or Path
-      const entries = await libraryManager.getAllEntries();
-      let libraryEntry = entries.find(e => 
-        (e.metadata?.hash && process.hash && e.metadata.hash === process.hash) || 
-        (e.executablePath && process.exePath && e.executablePath.toLowerCase() === process.exePath.toLowerCase())
+      // Check Excluded Apps
+      const { settingsManager } = await import("./SettingsManager");
+      const excluded = (settingsManager.getSettings().excludedApps || []).map(x => x.toLowerCase().trim());
+      const isExcluded = excluded.some(ex => 
+        (ex && exeNameLower.includes(ex)) || 
+        (ex && exeNameLower === ex) || 
+        (ex && exePathLower.endsWith(ex)) ||
+        (ex && exePathLower.includes(ex))
       );
 
-      if (!libraryEntry) {
+      if (isExcluded) {
+        return; // Ignore excluded background utilities (e.g. Wallpaper Engine, update checkers)
+      }
+
+      // Deduplicate: See if we already have this in Library via Hash, Path, or Canonical Name
+      const entries = await libraryManager.getAllEntries();
+      const canonicalProcName = libraryManager.normalizeCanonicalTitle(process.name).toLowerCase();
+
+      let libraryEntry = entries.find(e => 
+        (e.metadata?.hash && process.hash && e.metadata.hash === process.hash) || 
+        (e.executablePath && process.exePath && e.executablePath.toLowerCase() === process.exePath.toLowerCase()) ||
+        (e.executableName && process.name && e.executableName.toLowerCase() === process.name.toLowerCase()) ||
+        (libraryManager.normalizeCanonicalTitle(e.title).toLowerCase() === canonicalProcName)
+      );
+
+      if (libraryEntry) {
+        // Update executable path / hash in case of app updates (e.g. Discord version bumped)
+        if (libraryEntry.executablePath !== process.exePath || libraryEntry.metadata?.hash !== process.hash) {
+          await libraryManager.updateEntry(libraryEntry.id, {
+            executablePath: process.exePath,
+            executableName: process.name,
+            metadata: {
+              ...(libraryEntry.metadata || {}),
+              hash: process.hash,
+            }
+          });
+        }
+      } else {
         // Prevent adding new unknown apps/games when offline since metadata detection will fail
         if (!navigator.onLine) {
            console.log(`[ProcessManager] Offline mode: ignoring unknown process ${process.name}`);
@@ -98,20 +129,17 @@ export class ProcessManager {
 
         // Unknown Process - Run heuristic Game Detector
         const detection = await gameDetector.evaluate(process);
+        const canonicalDetectedTitle = libraryManager.normalizeCanonicalTitle(detection.officialTitle).toLowerCase();
 
-        // Before creating a new entry, let's see if the detected officialTitle OR steamAppId matches an existing game
-        // that doesn't have an executable path yet (e.g., synced from Steam or manually added via wishlist)!
+        // Check if officialTitle or steamAppId matches an existing game
         libraryEntry = entries.find(e => {
-           if (e.type !== "game") return false;
-           // If it matches via Steam ID
            if (detection.steamAppId && e.metadata?.steamAppId === detection.steamAppId) return true;
-           // Or if it strictly matches the normalized title (and it's a bare entry with no exe yet)
-           if (e.title.toLowerCase() === detection.officialTitle.toLowerCase() && !e.executablePath) return true;
+           if (libraryManager.normalizeCanonicalTitle(e.title).toLowerCase() === canonicalDetectedTitle) return true;
            return false;
         });
 
         if (libraryEntry) {
-           // We found an existing synced game! Just bind the executable path to it!
+           // We found an existing synced game / app! Just bind the executable path to it!
            await libraryManager.updateEntry(libraryEntry.id, {
               executablePath: process.exePath,
               executableName: process.name,
@@ -123,7 +151,7 @@ export class ProcessManager {
            console.log(`[ProcessManager] Bound process to existing synced game: ${libraryEntry.title}`);
         } else {
           libraryEntry = await libraryManager.createEntry({
-            title: detection.officialTitle,
+            title: libraryManager.normalizeCanonicalTitle(detection.officialTitle),
             type: detection.isGame ? "game" : "application",
             executablePath: process.exePath,
             executableName: process.name,

@@ -331,6 +331,139 @@ export class LibraryManager {
     });
   }
 
+  /** Normalize title for deduplication and canonical matching */
+  normalizeCanonicalTitle(title: string): string {
+    return (title || "")
+      .replace(/\s*\((?:Program|Home Edition|64-bit|32-bit|x64|x86)\)/gi, "")
+      .replace(/\.exe$/i, "")
+      .replace(/[_-]+/g, " ")
+      .trim();
+  }
+
+  /** Merges duplicate applications/games and purges excluded entries */
+  async cleanupDuplicateEntries(): Promise<number> {
+    const rawEntries = getLocalData();
+    const activeEntries = rawEntries.filter(e => !e.deletedAt);
+    const { settingsManager } = await import("./SettingsManager");
+    const excluded = (settingsManager.getSettings().excludedApps || []).map(x => x.toLowerCase().trim());
+
+    let changed = false;
+    let mergedCount = 0;
+
+    // 1. Purge any active entries matching excluded apps
+    for (const entry of activeEntries) {
+      const titleLower = entry.title.toLowerCase();
+      const exeLower = (entry.executableName || "").toLowerCase();
+      const pathLower = (entry.executablePath || "").toLowerCase();
+
+      const isExcluded = excluded.some(ex => 
+        (ex && titleLower.includes(ex)) || 
+        (ex && exeLower === ex) || 
+        (ex && pathLower.endsWith(ex)) ||
+        (ex && pathLower.includes(ex))
+      );
+
+      if (isExcluded) {
+        entry.deletedAt = new Date().toISOString();
+        changed = true;
+      }
+    }
+
+    // 2. Group active remaining entries by canonical key
+    const remaining = activeEntries.filter(e => !e.deletedAt);
+    const groups = new Map<string, LibraryEntryWithRelations[]>();
+
+    for (const entry of remaining) {
+      const canonical = this.normalizeCanonicalTitle(entry.title).toLowerCase();
+      const key = `${entry.type}_${canonical}`;
+      const group = groups.get(key) || [];
+      group.push(entry);
+      groups.set(key, group);
+    }
+
+    for (const [key, group] of groups.entries()) {
+      if (group.length > 1) {
+        // Sort to find the best representative entry
+        // Priority: has image > higher playtime > has valid executablePath > newest
+        group.sort((a, b) => {
+          const aHasCover = a.images && a.images.length > 0 ? 1 : 0;
+          const bHasCover = b.images && b.images.length > 0 ? 1 : 0;
+          if (bHasCover !== aHasCover) return bHasCover - aHasCover;
+          if (b.playtimeTotal !== a.playtimeTotal) return b.playtimeTotal - a.playtimeTotal;
+          const aHasExe = a.executablePath ? 1 : 0;
+          const bHasExe = b.executablePath ? 1 : 0;
+          if (bHasExe !== aHasExe) return bHasExe - aHasExe;
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        });
+
+        const primary = group[0];
+        const duplicates = group.slice(1);
+
+        let combinedPlaytime = primary.playtimeTotal;
+        const allSessions = [...(primary.sessions || [])];
+        const now = new Date().toISOString();
+
+        for (const dup of duplicates) {
+          combinedPlaytime += dup.playtimeTotal || 0;
+          if (dup.sessions) {
+            allSessions.push(...dup.sessions);
+          }
+          dup.deletedAt = now;
+          mergedCount++;
+        }
+
+        primary.playtimeTotal = combinedPlaytime;
+        primary.sessions = allSessions;
+        primary.title = this.normalizeCanonicalTitle(primary.title);
+        primary.updatedAt = now;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      saveLocalData(rawEntries);
+      eventBus.emit("library:updated", { action: "deduplicated" });
+      console.log(`[LibraryManager] Deduplication complete. Merged ${mergedCount} duplicate entries.`);
+    }
+
+    return mergedCount;
+  }
+
+  async excludeApp(id: string): Promise<boolean> {
+    const entry = await this.getEntry(id);
+    if (!entry) return false;
+
+    const { settingsManager } = await import("./SettingsManager");
+    const settings = settingsManager.getSettings();
+    const currentExcluded = [...(settings.excludedApps || [])];
+
+    const candidates = [
+      entry.executableName,
+      entry.title,
+      entry.executablePath ? entry.executablePath.split("\\").pop() : null
+    ].filter(Boolean) as string[];
+
+    for (const c of candidates) {
+      const lower = c.toLowerCase().trim();
+      if (!currentExcluded.some(ex => ex.toLowerCase() === lower)) {
+        currentExcluded.push(lower);
+      }
+    }
+
+    await settingsManager.update({ excludedApps: currentExcluded });
+    await this.deleteEntry(id);
+    return true;
+  }
+
+  async unexcludeApp(nameOrExe: string): Promise<boolean> {
+    const { settingsManager } = await import("./SettingsManager");
+    const settings = settingsManager.getSettings();
+    const lower = nameOrExe.toLowerCase().trim();
+    const updated = (settings.excludedApps || []).filter(ex => ex.toLowerCase() !== lower);
+    await settingsManager.update({ excludedApps: updated });
+    return true;
+  }
+
   async deleteEntry(id: string) { return !!(await this.updateEntry(id, { deletedAt: new Date().toISOString() })); }
   async upsertReview(entryId: string, content: string, rating?: number) { return !!(await this.updateEntry(entryId, { rating, review: { content, rating } })); }
   async deleteReview(entryId: string) { return !!(await this.updateEntry(entryId, { rating: undefined, review: undefined })); }
