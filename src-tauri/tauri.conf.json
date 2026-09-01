@@ -27,9 +27,9 @@
       {
         "label": "agent-overlay",
         "title": "Vertex Agent",
-        "url": "/agent-overlay",
-        "width": 600,
-        "height": 300,
+        "url": "/?w=overlay",
+        "width": 520,
+        "height": 560,
         "resizable": false,
         "fullscreen": false,
         "center": true,
@@ -37,7 +37,8 @@
         "transparent": true,
         "visible": false,
         "skipTaskbar": true,
-        "alwaysOnTop": true
+        "alwaysOnTop": true,
+        "shadow": false
       },
       {
         "label": "agent-command-bar",

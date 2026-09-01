@@ -51,11 +51,13 @@ pub fn run() {
             let args: Vec<String> = std::env::args().collect();
             if args.contains(&"--hidden".to_string()) {
                 if let Some(window) = app.get_webview_window("main") {
-                    window.hide().unwrap();
+                    let _ = window.hide();
                 }
                 if let Some(agent_window) = app.get_webview_window("agent-overlay") {
-                    agent_window.show().unwrap();
-                    agent_window.set_focus().unwrap();
+                    let _ = agent_window.center();
+                    let _ = agent_window.show();
+                    let _ = agent_window.set_always_on_top(true);
+                    let _ = agent_window.set_focus();
                 }
             }
 
@@ -249,6 +251,7 @@ pub fn run() {
 
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
+                let _ = window.unminimize();
                 let _ = window.set_focus();
                 let _ = window.emit("deep-link-received", args.clone());
             }

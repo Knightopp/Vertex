@@ -204,6 +204,20 @@ const AppContent = () => {
     if (root) root.style.background = 'transparent';
     return <AgentCommandBar />;
   }
+
+  // If this window is the agent overlay / welcome popup, render it directly with transparency
+  if (new URLSearchParams(window.location.search).get('w') === 'overlay' || window.location.pathname === '/agent-overlay') {
+    document.documentElement.style.background = 'transparent';
+    document.body.style.background = 'transparent';
+    const root = document.getElementById('root');
+    if (root) root.style.background = 'transparent';
+    return (
+      <TooltipProvider>
+        <Sonner />
+        <AgentOverlay />
+      </TooltipProvider>
+    );
+  }
   
   return (
     <>

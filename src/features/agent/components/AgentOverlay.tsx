@@ -4,7 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { actionExecutor } from "@/services/agent/ActionExecutor";
 import { usePresetStore, Preset } from "@/stores/preset-store";
 import { useAuthStore } from "@/stores/auth-store";
-import { Gamepad2, Cpu, Video, BookOpen, Settings, Zap, Play, CheckSquare, Square, X, RotateCcw } from "lucide-react";
+import { Gamepad2, Cpu, Video, BookOpen, Settings, Zap, Play, CheckSquare, Square, X, RotateCcw, LayoutDashboard } from "lucide-react";
 import { sessionSnapshotManager, SessionSnapshot } from "@/services/SessionSnapshotManager";
 import { toast } from "sonner";
 
@@ -33,6 +33,9 @@ export const AgentOverlay: React.FC = () => {
   };
 
   useEffect(() => {
+    try {
+      getCurrentWindow().center().catch(() => {});
+    } catch (_) {}
     setIsVisible(true);
     const last = sessionSnapshotManager.getLastSessionSnapshot();
     if (last && last.apps.length > 0) {
@@ -55,6 +58,20 @@ export const AgentOverlay: React.FC = () => {
         await getCurrentWindow().hide();
       } catch (_) {}
     }, 180);
+  };
+
+  const openDashboard = async () => {
+    try {
+      const { getAllWebviewWindows } = await import("@tauri-apps/api/webviewWindow");
+      const windows = await getAllWebviewWindows();
+      const mainWin = windows.find(w => w.label === "main");
+      if (mainWin) {
+        await mainWin.show();
+        await mainWin.unminimize();
+        await mainWin.setFocus();
+      }
+    } catch (_) {}
+    await hideOverlay();
   };
 
   const handleToggleApp = (id: string) => {
@@ -116,13 +133,23 @@ export const AgentOverlay: React.FC = () => {
                 </p>
               </div>
 
-              <button
-                onClick={hideOverlay}
-                className="p-1.5 rounded-lg text-white/30 hover:text-white hover:bg-white/5 transition-colors"
-                style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1.5" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+                <button
+                  onClick={openDashboard}
+                  title="Open Full Dashboard"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <LayoutDashboard className="w-3.5 h-3.5" />
+                  <span>Open App</span>
+                </button>
+                <button
+                  onClick={hideOverlay}
+                  title="Dismiss (Esc)"
+                  className="p-1.5 rounded-lg text-white/30 hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Smart Session Resume Card */}
@@ -259,7 +286,17 @@ export const AgentOverlay: React.FC = () => {
 
             {/* Footer */}
             <div className="px-6 py-3 border-t border-white/5 flex items-center justify-between bg-black/40">
-              <span className="text-[10px] font-mono text-white/30">Press Esc to dismiss</span>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-mono text-white/30">Press Esc to dismiss</span>
+                <span className="text-white/10">•</span>
+                <button 
+                  onClick={openDashboard} 
+                  className="text-[10px] font-mono text-white/40 hover:text-white underline underline-offset-2 transition-colors"
+                  style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+                >
+                  Open Dashboard
+                </button>
+              </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.8)]" />
                 <span className="text-[10px] font-mono text-white/40 font-medium">Ready</span>
