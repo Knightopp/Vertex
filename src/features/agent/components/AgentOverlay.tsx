@@ -236,51 +236,18 @@ export const AgentOverlay: React.FC = () => {
             )}
 
             {/* Presets Title if snapshot present */}
-            {snapshot && presets.length > 0 && (
-              <div className="px-6 pt-4 pb-1">
-                <p className="text-xs font-bold text-white/30 uppercase tracking-wider">Or Start a Workflow</p>
-              </div>
-            )}
 
             {/* Presets grid */}
-            {presets.length > 0 && (
-              <div
-                className="p-4 grid grid-cols-2 gap-2 max-h-56 overflow-y-auto hide-scrollbar"
-                style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-              >
-                {presets.map((preset: Preset) => (
-                  <button
-                    key={preset.id}
-                    onClick={() => handlePresetClick(preset.name)}
-                    className="flex items-center gap-3 p-3 rounded-xl border border-white/5 bg-white/[0.03] hover:bg-white hover:text-black hover:border-white transition-all duration-150 text-left group"
-                  >
-                    <div className="p-1.5 rounded-lg bg-white/5 text-white/50 group-hover:bg-black/10 group-hover:text-black transition-colors shrink-0">
-                      {iconMap[preset.icon] ?? <Settings className="w-4 h-4" />}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-white group-hover:text-black text-sm font-semibold truncate transition-colors">
-                        {preset.name}
-                      </p>
-                      {preset.description && (
-                        <p className="text-white/35 group-hover:text-black/50 text-xs truncate transition-colors">
-                          {preset.description}
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
 
-            {/* Empty state (only if no presets and no snapshot) */}
-            {presets.length === 0 && !snapshot && (
+            {/* Empty state (only if no snapshot) */}
+            {!snapshot && (
               <div
                 className="px-6 py-8 flex flex-col items-center gap-2 text-center"
                 style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
               >
                 <Zap className="w-6 h-6 text-white/20" />
-                <p className="text-sm text-white/40">No presets configured yet.</p>
-                <p className="text-xs text-white/20">Go to Settings → Workflows & Presets to create one.</p>
+                <p className="text-sm text-white/40">No active session.</p>
+                <p className="text-xs text-white/20">Open the dashboard to get started.</p>
               </div>
             )}
 

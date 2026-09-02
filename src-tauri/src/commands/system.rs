@@ -213,12 +213,20 @@ pub fn set_autostart(enable: bool) -> Result<(), String> {
 pub fn launch_game(path_or_url: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
-        std::process::Command::new("cmd")
-            .creation_flags(0x08000000)
-            .args(["/C", "start", "", &path_or_url])
-            .spawn()
-            .map_err(|e| format!("Failed to launch game: {}", e))?;
+        use windows::Win32::UI::Shell::ShellExecuteW;
+        use windows::Win32::UI::WindowsAndMessaging::SW_SHOW;
+        use windows::core::{PCWSTR, HSTRING};
+        use windows::Win32::Foundation::HWND;
+
+        unsafe {
+            let file = HSTRING::from(&path_or_url);
+            let op = HSTRING::from("open");
+            let result = ShellExecuteW(HWND(0 as _), PCWSTR(op.as_ptr()), PCWSTR(file.as_ptr()), None, None, SW_SHOW);
+            
+            if (result.0 as isize) <= 32 {
+                return Err(format!("Failed to launch game: Error code {}", result.0 as isize));
+            }
+        }
         Ok(())
     }
 

@@ -49,16 +49,14 @@ pub fn run() {
             app.manage(Mutex::new(db));
 
             let args: Vec<String> = std::env::args().collect();
-            if args.contains(&"--hidden".to_string()) {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.hide();
-                }
-                if let Some(agent_window) = app.get_webview_window("agent-overlay") {
-                    let _ = agent_window.center();
-                    let _ = agent_window.show();
-                    let _ = agent_window.set_always_on_top(true);
-                    let _ = agent_window.set_focus();
-                }
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.hide();
+            }
+            if let Some(agent_window) = app.get_webview_window("agent-overlay") {
+                let _ = agent_window.center();
+                let _ = agent_window.show();
+                let _ = agent_window.set_always_on_top(true);
+                let _ = agent_window.set_focus();
             }
 
             #[cfg(desktop)]
