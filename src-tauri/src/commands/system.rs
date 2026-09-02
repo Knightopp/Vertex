@@ -93,48 +93,111 @@ pub fn set_autostart(enable: bool) -> Result<(), String> {
         use winreg::RegKey;
 
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let path = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+        let run_path = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+        let approved_run_path =
+            "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
 
         let app_name = "Vertex";
         let legacy_name = "Vazorism";
 
         if enable {
-            let exe_path =
+            let current_exe =
                 env::current_exe().map_err(|e| format!("Failed to get exe path: {}", e))?;
 
-            // 1. Task Scheduler with 0s delay and HIGHEST runlevel for instant high-priority boot
-            let tr_arg = format!("\"{}\" --hidden", exe_path.display());
-            let _ = std::process::Command::new("schtasks")
-                .creation_flags(0x08000000)
-                .args([
-                    "/Create",
-                    "/TN", "VertexFastStartup",
-                    "/TR", &tr_arg,
-                    "/SC", "ONLOGON",
-                    "/RL", "HIGHEST",
-                    "/F",
-                    "/DELAY", "0000:00",
-                ])
-                .status();
+            // If running inside a development target directory, prefer the installed binary if available
+            let exe_path = if current_exe.to_string_lossy().contains("target\\debug")
+                || current_exe.to_string_lossy().contains("target\\release")
+            {
+                let local_app_data = env::var("LOCALAPPDATA").unwrap_or_default();
+                let installed_vazorism = std::path::PathBuf::from(&local_app_data)
+                    .join("Vertex")
+                    .join("vazorism.exe");
+                let installed_vertex = std::path::PathBuf::from(&local_app_data)
+                    .join("Vertex")
+                    .join("Vertex.exe");
+                if installed_vertex.exists() {
+                    installed_vertex
+                } else if installed_vazorism.exists() {
+                    installed_vazorism
+                } else {
+                    current_exe
+                }
+            } else {
+                current_exe
+            };
 
-            // 2. Registry fallback
-            if let Ok(key) = hkcu.open_subkey_with_flags(path, KEY_SET_VALUE) {
+            // 1. Registry HKCU Run key
+            if let Ok((key, _)) = hkcu.create_subkey(run_path) {
                 let value = format!("\"{}\" --hidden", exe_path.display());
                 let _ = key.set_value(app_name, &value);
                 let _ = key.delete_value(legacy_name);
             }
-        } else {
-            // Remove Task Scheduler task
+
+            // 2. Unblock / Enable in Windows Explorer StartupApproved (0x02 = Enabled)
+            if let Ok((approved_key, _)) = hkcu.create_subkey(approved_run_path) {
+                let enabled_bytes: [u8; 12] = [
+                    0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                ];
+                let reg_val = winreg::RegValue {
+                    vtype: RegType::REG_BINARY,
+                    bytes: enabled_bytes.to_vec(),
+                };
+                let _ = approved_key.set_raw_value(app_name, &reg_val);
+                let _ = approved_key.delete_value(legacy_name);
+            }
+
+            // 3. Fallback Startup Folder Shortcut
+            if let Ok(appdata) = env::var("APPDATA") {
+                let startup_dir = std::path::PathBuf::from(appdata)
+                    .join("Microsoft\\Windows\\Start Menu\\Programs\\Startup");
+                let lnk_path = startup_dir.join("Vertex.lnk");
+                let legacy_lnk = startup_dir.join("Vazorism.lnk");
+                let _ = std::fs::remove_file(legacy_lnk);
+
+                let _ = std::fs::create_dir_all(&startup_dir);
+                let ps_script = format!(
+                    "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('{}'); $s.TargetPath = '{}'; $s.Arguments = '--hidden'; $s.WorkingDirectory = '{}'; $s.IconLocation = '{},0'; $s.Save()",
+                    lnk_path.display(),
+                    exe_path.display(),
+                    exe_path.parent().unwrap_or(&exe_path).display(),
+                    exe_path.display()
+                );
+                let _ = std::process::Command::new("powershell")
+                    .creation_flags(0x08000000)
+                    .args(["-NoProfile", "-NonInteractive", "-Command", &ps_script])
+                    .status();
+            }
+
+            // 4. Clean up any invalid Task Scheduler task
             let _ = std::process::Command::new("schtasks")
                 .creation_flags(0x08000000)
                 .args(["/Delete", "/TN", "VertexFastStartup", "/F"])
                 .status();
-
+        } else {
             // Remove Registry entries
-            if let Ok(key) = hkcu.open_subkey_with_flags(path, KEY_SET_VALUE) {
+            if let Ok(key) = hkcu.open_subkey_with_flags(run_path, KEY_SET_VALUE) {
                 let _ = key.delete_value(app_name);
                 let _ = key.delete_value(legacy_name);
             }
+            if let Ok(approved_key) = hkcu.open_subkey_with_flags(approved_run_path, KEY_SET_VALUE)
+            {
+                let _ = approved_key.delete_value(app_name);
+                let _ = approved_key.delete_value(legacy_name);
+            }
+
+            // Remove Startup Folder shortcuts
+            if let Ok(appdata) = env::var("APPDATA") {
+                let startup_dir = std::path::PathBuf::from(appdata)
+                    .join("Microsoft\\Windows\\Start Menu\\Programs\\Startup");
+                let _ = std::fs::remove_file(startup_dir.join("Vertex.lnk"));
+                let _ = std::fs::remove_file(startup_dir.join("Vazorism.lnk"));
+            }
+
+            // Remove Task Scheduler task if any
+            let _ = std::process::Command::new("schtasks")
+                .creation_flags(0x08000000)
+                .args(["/Delete", "/TN", "VertexFastStartup", "/F"])
+                .status();
         }
 
         Ok(())
