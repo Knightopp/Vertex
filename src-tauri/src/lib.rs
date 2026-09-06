@@ -238,6 +238,7 @@ pub fn run() {
             Some(vec!["--hidden"]),
         ))
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            let has_deep_link = args.iter().any(|a| a.starts_with("vazorism://"));
             if let Some(url) = args.iter().find(|a| a.starts_with("vazorism://")) {
                 let _ = std::fs::write(
                     "C:\\Users\\ABHIRAM C S\\Desktop\\Tracker\\exported\\debug_deep_link.txt",
@@ -247,11 +248,20 @@ pub fn run() {
                 *state.0.lock().unwrap() = Some(url.clone());
             }
 
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-                let _ = window.emit("deep-link-received", args.clone());
+            if has_deep_link {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.unminimize();
+                    let _ = window.set_focus();
+                    let _ = window.emit("deep-link-received", args.clone());
+                }
+            } else {
+                if let Some(agent_window) = app.get_webview_window("agent-overlay") {
+                    let _ = agent_window.center();
+                    let _ = agent_window.show();
+                    let _ = agent_window.set_always_on_top(true);
+                    let _ = agent_window.set_focus();
+                }
             }
         }))
         .plugin(tauri_plugin_updater::Builder::new().build());

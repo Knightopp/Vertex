@@ -306,10 +306,13 @@ pub fn get_installed_apps() -> Vec<InstalledApp> {
         if let Ok(appdata) = std::env::var("APPDATA") {
             dirs.push(std::path::PathBuf::from(appdata).join("Microsoft\\Windows\\Start Menu\\Programs"));
         }
+        if let Ok(localappdata) = std::env::var("LOCALAPPDATA") {
+            dirs.push(std::path::PathBuf::from(localappdata).join("Microsoft\\WindowsApps"));
+        }
 
         for dir in dirs {
             if dir.exists() {
-                scan_lnk_files(&dir, &mut apps);
+                scan_app_files(&dir, &mut apps);
             }
         }
 
@@ -323,14 +326,15 @@ pub fn get_installed_apps() -> Vec<InstalledApp> {
     }
 }
 
-fn scan_lnk_files(dir: &std::path::Path, apps: &mut Vec<InstalledApp>) {
+fn scan_app_files(dir: &std::path::Path, apps: &mut Vec<InstalledApp>) {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                scan_lnk_files(&path, apps);
+                scan_app_files(&path, apps);
             } else if let Some(ext) = path.extension() {
-                if ext.to_string_lossy().to_lowercase() == "lnk" {
+                let ext_str = ext.to_string_lossy().to_lowercase();
+                if ext_str == "lnk" || ext_str == "exe" {
                     if let Some(stem) = path.file_stem() {
                         let name = stem.to_string_lossy().to_string();
                         let lower = name.to_lowercase();

@@ -93,6 +93,7 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
                     || file_name == "securityhealthsystray.exe"
                     || file_name == "compattelrunner.exe"
                     || file_name == "conhost.exe"
+                    || file_name == "explorer.exe"
                     || (file_name == "applicationframehost.exe"
                         && (title_lower.is_empty() || title_lower == "application frame host"))
                     || title_lower.is_empty()

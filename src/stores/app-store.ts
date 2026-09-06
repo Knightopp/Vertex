@@ -59,7 +59,24 @@ export const useAppStore = create<AppState>((set, get) => ({
         const update = await check();
         if (update) {
           set({ updateAvailable: { version: update.version, body: update.body, isAndroid: false, updateData: update } });
-          if (manual) toast.success(`Update v${update.version} found! Check your notifications.`);
+          
+          toast.success(`Update v${update.version} found! Check your settings to install.`);
+
+          if (!manual) {
+            // Trigger native system notification if checked in background
+            if ("Notification" in window) {
+              const notifBody = `Version v${update.version} is available to download.`;
+              if (Notification.permission === "granted") {
+                new Notification("Vertex Update Available", { body: notifBody, silent: false });
+              } else if (Notification.permission !== "denied") {
+                Notification.requestPermission().then((perm) => {
+                  if (perm === "granted") {
+                    new Notification("Vertex Update Available", { body: notifBody, silent: false });
+                  }
+                });
+              }
+            }
+          }
         } else {
           if (manual) toast.info("You are on the latest version.");
         }
