@@ -11,6 +11,7 @@ export type AppSettings = {
   pinnedGamesOrder: string[];
   favoriteGamesOrder: string[];
   tutorialCompleted: boolean;
+  showWelcomeOverlay: boolean;
   agentEnabled: boolean;
   agentGlobalShortcut: string;
   agentScreenshotDir: string;
@@ -44,6 +45,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   pinnedGamesOrder: [],
   favoriteGamesOrder: [],
   tutorialCompleted: false,
+  showWelcomeOverlay: true,
   agentEnabled: true,
   agentGlobalShortcut: "Ctrl+Alt+Space",
   agentScreenshotDir: "",

@@ -87,6 +87,16 @@ export default function Settings() {
     }
   };
 
+  const handleToggleWelcomeOverlay = () => {
+    const newValue = !(settings.showWelcomeOverlay ?? true);
+    updateSettings({ showWelcomeOverlay: newValue });
+    if (newValue) {
+      toast.success("Welcome overlay enabled — will show on next launch");
+    } else {
+      toast.info("Welcome overlay disabled");
+    }
+  };
+
   const handleAddScanPath = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newScanPath.trim()) return;
@@ -373,6 +383,17 @@ export default function Settings() {
                     <div className="relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black cursor-pointer" onClick={handleToggleDiscord}>
                       <div className={cn("absolute inset-0 rounded-full transition-colors", settings.discordRichPresence ? "bg-white" : "bg-white/10")} />
                       <span className={cn("absolute inline-block h-5 w-5 transform rounded-full transition-transform duration-200 ease-in-out", settings.discordRichPresence ? "translate-x-8 bg-black" : "translate-x-1 bg-white/50")} />
+                    </div>
+                  </label>
+
+                  <label className="flex items-center justify-between p-4 rounded-2xl bg-black/20 border border-white/5 cursor-pointer hover:bg-black/30 transition-colors">
+                    <div>
+                      <h4 className="font-bold text-white text-lg">Welcome Overlay on Launch</h4>
+                      <p className="text-white/50 text-sm">Show the welcome popup with session resume when Vertex starts. Disable this if it blocks your screen.</p>
+                    </div>
+                    <div className="relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-black cursor-pointer" onClick={handleToggleWelcomeOverlay}>
+                      <div className={cn("absolute inset-0 rounded-full transition-colors", (settings.showWelcomeOverlay ?? true) ? "bg-white" : "bg-white/10")} />
+                      <span className={cn("absolute inline-block h-5 w-5 transform rounded-full transition-transform duration-200 ease-in-out", (settings.showWelcomeOverlay ?? true) ? "translate-x-8 bg-black" : "translate-x-1 bg-white/50")} />
                     </div>
                   </label>
 

@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { Gamepad2, Cpu, Video, BookOpen, Settings, Zap, Play, CheckSquare, Square, X, RotateCcw, LayoutDashboard } from "lucide-react";
 import { sessionSnapshotManager, SessionSnapshot } from "@/services/SessionSnapshotManager";
 import { toast } from "sonner";
+import { settingsManager } from "@/services/SettingsManager";
 
 const iconMap: Record<string, React.ReactNode> = {
   Gamepad2: <Gamepad2 className="w-4 h-4" />,
@@ -32,9 +33,41 @@ export const AgentOverlay: React.FC = () => {
     return "Good evening";
   };
 
-  useEffect(() => {
+  // Reliably hide the overlay window and stop it from blocking clicks
+  const hideOverlay = async () => {
+    setIsVisible(false);
+    // IMMEDIATELY stop capturing mouse events so clicks pass through right away
     try {
-      getCurrentWindow().center().catch(() => {});
+      await getCurrentWindow().setIgnoreCursorEvents(true);
+    } catch (_) {}
+    // After exit animation completes, fully hide the window
+    setTimeout(async () => {
+      try {
+        const win = getCurrentWindow();
+        await win.setAlwaysOnTop(false);
+        await win.hide();
+      } catch (_) {}
+    }, 200);
+  };
+
+  useEffect(() => {
+    const win = getCurrentWindow();
+
+    // Check if welcome overlay is disabled in settings
+    const showOverlay = settingsManager.getSettings().showWelcomeOverlay ?? true;
+    if (!showOverlay) {
+      // Immediately make the window invisible and non-blocking
+      win.setIgnoreCursorEvents(true).catch(() => {});
+      win.setAlwaysOnTop(false).catch(() => {});
+      win.hide().catch(() => {});
+      return;
+    }
+
+    // Re-enable cursor events when this overlay is meant to show
+    win.setIgnoreCursorEvents(false).catch(() => {});
+
+    try {
+      win.center().catch(() => {});
     } catch (_) {}
     setIsVisible(true);
     const last = sessionSnapshotManager.getLastSessionSnapshot();
@@ -50,15 +83,6 @@ export const AgentOverlay: React.FC = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
-
-  const hideOverlay = async () => {
-    setIsVisible(false);
-    setTimeout(async () => {
-      try {
-        await getCurrentWindow().hide();
-      } catch (_) {}
-    }, 180);
-  };
 
   const openDashboard = async () => {
     try {
@@ -277,3 +301,4 @@ export const AgentOverlay: React.FC = () => {
 };
 
 export default AgentOverlay;
+
