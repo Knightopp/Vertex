@@ -50,38 +50,53 @@ export const AgentOverlay: React.FC = () => {
     }, 200);
   };
 
-  useEffect(() => {
+  // Shows the overlay if the user setting allows it
+  const showOverlayIfAllowed = async () => {
     const win = getCurrentWindow();
-
-    // Check if welcome overlay is disabled in settings
     const showOverlay = settingsManager.getSettings().showWelcomeOverlay ?? true;
     if (!showOverlay) {
-      // Immediately make the window invisible and non-blocking
+      // Keep window invisible and non-blocking
       win.setIgnoreCursorEvents(true).catch(() => {});
       win.setAlwaysOnTop(false).catch(() => {});
       win.hide().catch(() => {});
       return;
     }
 
-    // Re-enable cursor events when this overlay is meant to show
-    win.setIgnoreCursorEvents(false).catch(() => {});
+    // Re-enable cursor events and show the window from the frontend side
+    await win.setIgnoreCursorEvents(false).catch(() => {});
+    await win.center().catch(() => {});
+    await win.show().catch(() => {});
+    await win.setAlwaysOnTop(true).catch(() => {});
+    await win.setFocus().catch(() => {});
 
-    try {
-      win.center().catch(() => {});
-    } catch (_) {}
     setIsVisible(true);
     const last = sessionSnapshotManager.getLastSessionSnapshot();
     if (last && last.apps.length > 0) {
       setSnapshot(last);
-      // Pre-select all apps from last session
       setSelectedAppIds(last.apps.map(a => a.id));
     }
+  };
+
+  useEffect(() => {
+    // On initial mount, decide whether to show
+    showOverlayIfAllowed();
+
+    // Listen for second-instance launches that ask us to re-check
+    let unlistenOverlay: (() => void) | undefined;
+    import("@tauri-apps/api/event").then(({ listen }) => {
+      listen("check-overlay", () => {
+        showOverlayIfAllowed();
+      }).then((fn) => { unlistenOverlay = fn; }).catch(() => {});
+    }).catch(() => {});
 
     const handleKeyDown = async (e: KeyboardEvent) => {
       if (e.key === "Escape") await hideOverlay();
     };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      unlistenOverlay?.();
+    };
   }, []);
 
   const openDashboard = async () => {

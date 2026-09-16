@@ -52,12 +52,8 @@ pub fn run() {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.hide();
             }
-            if let Some(agent_window) = app.get_webview_window("agent-overlay") {
-                let _ = agent_window.center();
-                let _ = agent_window.show();
-                let _ = agent_window.set_always_on_top(true);
-                let _ = agent_window.set_focus();
-            }
+            // Don't force-show the agent-overlay here — the frontend
+            // will show it only if the user hasn't disabled showWelcomeOverlay.
 
             #[cfg(desktop)]
             {
@@ -256,11 +252,11 @@ pub fn run() {
                     let _ = window.emit("deep-link-received", args.clone());
                 }
             } else {
+                // Don't force-show the agent-overlay — the frontend handles
+                // overlay visibility based on the showWelcomeOverlay setting.
+                // Just emit an event so the frontend can decide.
                 if let Some(agent_window) = app.get_webview_window("agent-overlay") {
-                    let _ = agent_window.center();
-                    let _ = agent_window.show();
-                    let _ = agent_window.set_always_on_top(true);
-                    let _ = agent_window.set_focus();
+                    let _ = agent_window.emit("check-overlay", ());
                 }
             }
         }))
