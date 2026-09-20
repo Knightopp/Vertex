@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Vertex",
-  "version": "1.7.3",
+  "version": "1.7.4",
   "identifier": "com.vazorism.app",
   "build": {
     "frontendDist": "../dist",
@@ -59,7 +59,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: https://corsproxy.io https://images.unsplash.com https://upload.wikimedia.org https://cdn.discordapp.com https://*.googleusercontent.com https://*.igdb.com https://*.rawg.io https://*.steamstatic.com https://*.akamaihd.net https://*.allorigins.win https://*.steamgriddb.com https://ui-avatars.com data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://corsproxy.io https://*.igdb.com https://*.rawg.io https://store.steampowered.com https://*.cheapshark.com https://*.allorigins.win https://www.pcgamingwiki.com https://id.twitch.tv https://clients3.google.com https://*.steamgriddb.com https://ui-avatars.com https://fpzbupubmmryjjnyfear.supabase.co"
+      "csp": "default-src 'self'; img-src 'self' asset: https://corsproxy.io https://images.unsplash.com https://upload.wikimedia.org https://cdn.discordapp.com https://*.googleusercontent.com https://*.igdb.com https://*.rawg.io https://*.steamstatic.com https://*.akamaihd.net https://*.allorigins.win https://*.steamgriddb.com https://ui-avatars.com https://cdn.jsdelivr.net https://raw.githubusercontent.com data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://corsproxy.io https://*.igdb.com https://*.rawg.io https://store.steampowered.com https://*.cheapshark.com https://*.allorigins.win https://www.pcgamingwiki.com https://id.twitch.tv https://clients3.google.com https://*.steamgriddb.com https://ui-avatars.com https://fpzbupubmmryjjnyfear.supabase.co"
     },
     "trayIcon": {
       "iconPath": "icons/icon.ico",

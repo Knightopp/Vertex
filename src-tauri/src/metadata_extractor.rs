@@ -87,7 +87,12 @@ unsafe fn query_string_value(buffer: &[u8], lang: u16, code: u16, name: &str) ->
     .as_bool()
         && val_len > 0
     {
-        let val = std::slice::from_raw_parts(val_ptr as *const u16, (val_len - 1) as usize);
+        let raw = std::slice::from_raw_parts(val_ptr as *const u16, val_len as usize);
+        // Truncate at the first null character — VerQueryValueW often over-reports
+        // the length, including trailing nulls and sometimes adjacent resource data
+        // (e.g. "Resident Evil Village\0\00\0FileVersion\0...")
+        let end = raw.iter().position(|&c| c == 0).unwrap_or(raw.len());
+        let val = &raw[..end];
         let s = std::ffi::OsString::from_wide(val)
             .to_string_lossy()
             .into_owned();

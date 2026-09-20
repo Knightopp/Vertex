@@ -25,6 +25,13 @@ export class GameDetector {
     
     let resolvedTitle = process.productName || process.fileDescription || process.name.replace(".exe", "");
 
+    // Sanitize: strip control chars / null bytes and version-info fragments
+    // that Windows VerQueryValueW sometimes leaks into productName
+    resolvedTitle = resolvedTitle
+      .replace(/[\x00-\x1f]/g, "")
+      .replace(/\s*(FileVersion|ProductVersion|CompanyName|InternalName|OriginalFilename|LegalCopyright).*$/i, "")
+      .trim();
+
     // 1. Check known launchers/paths (+30)
     if (GAME_FOLDERS.some(folder => pathLower.includes(folder))) {
       confidence += 30;
@@ -69,8 +76,11 @@ export class GameDetector {
     try {
       const matches = await steamProvider.search(resolvedTitle);
       const normalizedTitle = resolvedTitle.toLowerCase().replace(/[^a-z0-9]/g, "");
-      // Only accept exact alphanumeric matches to prevent false positives
-      const match = matches.find(m => m.title.toLowerCase().replace(/[^a-z0-9]/g, "") === normalizedTitle);
+      // Fuzzy match: accept exact, substring, or high-confidence first result
+      const match = matches.find(m => {
+        const norm = m.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+        return norm === normalizedTitle || norm.includes(normalizedTitle) || normalizedTitle.includes(norm);
+      }) || (matches.length > 0 && matches[0].confidence >= 0.8 ? matches[0] : undefined);
       
       if (match) {
         confidence += 30;
@@ -89,7 +99,7 @@ export class GameDetector {
     // Future expansions: IGDB -> RAWG -> PCGamingWiki could be cascaded here.
     
     return {
-      isGame: confidence >= 80,
+      isGame: confidence >= 60,
       confidence,
       officialTitle,
       steamAppId,

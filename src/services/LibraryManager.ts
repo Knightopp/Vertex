@@ -195,7 +195,11 @@ export class LibraryManager {
     const entry = await this.getEntry(id); if (!entry) return null;
     const query = entry.title.replace(/\.exe$/i, "").replace(/[_-]+/g, " ");
     const matches = await steamProvider.search(query);
-    const best = matches.find((match) => match.title.toLowerCase() === query.toLowerCase()) ?? matches[0];
+    const queryNorm = query.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const best = matches.find((match) => {
+      const titleNorm = match.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+      return titleNorm === queryNorm || titleNorm.includes(queryNorm) || queryNorm.includes(titleNorm);
+    }) ?? (matches.length > 0 ? matches[0] : undefined);
     
     let timeToBeat: number | undefined;
     if (best) {
@@ -302,33 +306,70 @@ export class LibraryManager {
     }
   }
 
-  /** Enrich an application only when Steam has an exact software/title match, fallback to SteamGridDB */
+  /** Enrich an application: SteamGridDB → Steam → exe icon extraction fallback */
   async enrichApplication(id: string) {
     const entry = await this.getEntry(id); if (!entry) return null;
     const query = entry.title.replace(/\.exe$/i, "").replace(/[_-]+/g, " ");
     
-    // First try SteamGridDB for high-quality application posters (VS Code, Discord, etc.)
-    const sgdbMatch = await steamGridDB.searchGame(query);
-    if (sgdbMatch) {
-      const coverUrl = await steamGridDB.getCoverUrl(sgdbMatch.id);
-      if (coverUrl) {
-        return this.updateEntry(id, {
-          title: sgdbMatch.name,
-          images: [{ type: "cover", remoteUrl: coverUrl, isPrimary: true }]
-        });
+    // 1. Try SteamGridDB for high-quality application posters (VS Code, Discord, etc.)
+    try {
+      const sgdbMatch = await steamGridDB.searchGame(query);
+      if (sgdbMatch) {
+        const coverUrl = await steamGridDB.getCoverUrl(sgdbMatch.id);
+        if (coverUrl) {
+          return this.updateEntry(id, {
+            title: sgdbMatch.name,
+            images: [{ type: "cover", remoteUrl: coverUrl, isPrimary: true }]
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("[LibraryManager] SteamGridDB enrichment failed:", e);
+    }
+
+    // 2. Try Steam with fuzzy matching
+    try {
+      const normalized = query.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const matches = await steamProvider.search(query);
+      const match = matches.find((item) => {
+        const titleNorm = item.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+        return titleNorm === normalized || titleNorm.includes(normalized) || normalized.includes(titleNorm);
+      });
+      if (match) {
+        const metadata = await steamProvider.getMetadata(match.providerId);
+        if (metadata && metadata.coverUrl) {
+          return this.updateEntry(id, {
+            title: metadata.title,
+            metadata: { description: metadata.description, developer: metadata.developer, publisher: metadata.publisher, genres: metadata.genres, steamAppId: metadata.providerIds.steam, source: "steam" },
+            images: [{ type: "cover", remoteUrl: metadata.coverUrl, isPrimary: true }],
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("[LibraryManager] Steam enrichment failed:", e);
+    }
+
+    // 3. Fallback: extract exe icon and use as a data:url cover
+    if (entry.executablePath && entry.metadata?.hash) {
+      try {
+        const { getProcessIcon } = await import("../lib/tauri-ipc");
+        const bytes = await getProcessIcon(entry.executablePath, entry.metadata.hash);
+        if (bytes && bytes.length > 0) {
+          // Convert to base64 data URL for persistent storage in localStorage
+          const uint8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+          const binary = Array.from(uint8).map(b => String.fromCharCode(b)).join("");
+          const base64 = btoa(binary);
+          const dataUrl = `data:image/png;base64,${base64}`;
+          return this.updateEntry(id, {
+            images: [{ type: "cover", remoteUrl: dataUrl, isPrimary: true }]
+          });
+        }
+      } catch (e) {
+        console.warn("[LibraryManager] Icon extraction fallback failed:", e);
       }
     }
 
-    const normalized = query.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const match = (await steamProvider.search(query)).find((item) => item.title.toLowerCase().replace(/[^a-z0-9]/g, "") === normalized);
-    if (!match) return entry;
-    const metadata = await steamProvider.getMetadata(match.providerId);
-    if (!metadata) return entry;
-    return this.updateEntry(id, {
-      title: metadata.title,
-      metadata: { description: metadata.description, developer: metadata.developer, publisher: metadata.publisher, genres: metadata.genres, steamAppId: metadata.providerIds.steam, source: "steam" },
-      images: metadata.coverUrl ? [{ type: "cover", remoteUrl: metadata.coverUrl, isPrimary: true }] : entry.images,
-    });
+    return entry;
   }
 
   /** Normalize title for deduplication and canonical matching */

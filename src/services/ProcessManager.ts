@@ -150,8 +150,14 @@ export class ProcessManager {
            });
            console.log(`[ProcessManager] Bound process to existing synced game: ${libraryEntry.title}`);
         } else {
+          // Sanitize detected title: strip control chars and version-info fragments
+          const cleanTitle = detection.officialTitle
+            .replace(/[\x00-\x1f]/g, "")
+            .replace(/\s*(FileVersion|ProductVersion|CompanyName|InternalName|OriginalFilename|LegalCopyright).*$/i, "")
+            .trim();
+
           libraryEntry = await libraryManager.createEntry({
-            title: libraryManager.normalizeCanonicalTitle(detection.officialTitle),
+            title: libraryManager.normalizeCanonicalTitle(cleanTitle),
             type: detection.isGame ? "game" : "application",
             executablePath: process.exePath,
             executableName: process.name,
