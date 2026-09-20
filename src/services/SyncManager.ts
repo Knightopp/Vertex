@@ -54,6 +54,15 @@ export class SyncManager {
   private isSyncing = false;
   private syncInterval: NodeJS.Timeout | null = null;
 
+  /** Strip control characters and version-info junk from strings before syncing to Supabase */
+  private sanitizeString(str: string | undefined | null): string | undefined {
+    if (!str) return undefined;
+    return str
+      .replace(/[\x00-\x1f\x7f]/g, "")
+      .replace(/\s*(FileVersion|ProductVersion|CompanyName|InternalName|OriginalFilename|LegalCopyright).*$/i, "")
+      .trim() || undefined;
+  }
+
   init() {
     // Listen for online events
     window.addEventListener("online", () => {
@@ -63,6 +72,20 @@ export class SyncManager {
 
     // Start background sync every 30 seconds
     this.syncInterval = setInterval(() => this.triggerSync(), 30000);
+
+    // Sanitize any corrupted titles already stuck in the sync queue
+    const queue = getSyncQueue();
+    let queueDirty = false;
+    for (const op of queue) {
+      if (op.payload?.title) {
+        const clean = this.sanitizeString(op.payload.title);
+        if (clean !== op.payload.title) {
+          op.payload.title = clean || "Unknown";
+          queueDirty = true;
+        }
+      }
+    }
+    if (queueDirty) saveSyncQueue(queue);
 
     // Initial sync
     setTimeout(() => {
@@ -169,18 +192,24 @@ export class SyncManager {
             const heroImage = op.payload.images?.find((img: any) => img.type === "hero");
             const iconImage = op.payload.images?.find((img: any) => img.type === "icon");
 
+            // Sanitize title and image URLs to prevent Supabase Unicode errors from corrupted version-info strings
+            const syncTitle = this.sanitizeString(op.payload.title) || "Unknown";
+            // Don't sync data:url covers — they're too large for the DB and are a local fallback only
+            const syncCoverUrl = coverImage?.remoteUrl?.startsWith("data:") ? undefined : coverImage?.remoteUrl;
+            const syncBannerUrl = heroImage?.remoteUrl?.startsWith("data:") ? undefined : heroImage?.remoteUrl;
+
             const { error } = await supabase.from("library_games").upsert({
               user_id: userId,
               provider: op.payload.provider || "local",
               provider_game_id: op.payload.providerGameId || op.payload.id,
-              title: op.payload.title,
+              title: syncTitle,
               playtime_total: op.payload.playtimeTotal || 0,
               last_played_at: op.payload.lastPlayedAt,
               favorite: op.payload.favorite || false,
               hidden: op.payload.hidden || false,
               status: op.payload.status || "unplayed",
-              cover_url: coverImage?.remoteUrl,
-              banner_url: heroImage?.remoteUrl,
+              cover_url: syncCoverUrl,
+              banner_url: syncBannerUrl,
               icon_url: iconImage?.remoteUrl,
               sessions: op.payload.sessions || [],
               updated_at: new Date().toISOString()

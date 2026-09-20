@@ -79,6 +79,38 @@ function saveLocalData(data: LibraryEntryWithRelations[]) {
 }
 
 export class LibraryManager {
+  /** 
+   * Sanitize all existing entries with corrupted titles (control chars, version-info junk).
+   * Should be called once on startup to fix entries created before the metadata_extractor fix.
+   */
+  sanitizeCorruptedEntries(): number {
+    const entries = getLocalData();
+    let fixedCount = 0;
+    const controlCharRegex = /[\x00-\x1f\x7f]/;
+    const versionInfoRegex = /\s*(FileVersion|ProductVersion|CompanyName|InternalName|OriginalFilename|LegalCopyright)/i;
+
+    for (const entry of entries) {
+      if (entry.title && (controlCharRegex.test(entry.title) || versionInfoRegex.test(entry.title))) {
+        const cleanTitle = entry.title
+          .replace(/[\x00-\x1f\x7f]/g, "")
+          .replace(/\s*(FileVersion|ProductVersion|CompanyName|InternalName|OriginalFilename|LegalCopyright).*$/i, "")
+          .trim();
+        if (cleanTitle && cleanTitle !== entry.title) {
+          console.log(`[LibraryManager] Sanitized corrupted title: "${entry.title}" → "${cleanTitle}"`);
+          entry.title = cleanTitle;
+          entry.updatedAt = new Date().toISOString();
+          fixedCount++;
+        }
+      }
+    }
+
+    if (fixedCount > 0) {
+      saveLocalData(entries);
+      console.log(`[LibraryManager] Fixed ${fixedCount} corrupted entries.`);
+    }
+    return fixedCount;
+  }
+
   hasLegacyData(): boolean {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (!raw) return false;

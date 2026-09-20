@@ -11,8 +11,9 @@ export class ProcessManager {
   async startPolling(intervalMs: number = 3000): Promise<void> {
     if (this.pollingInterval) return;
 
-    // 0. Wipe all ghost running states on startup to fix stuck games and run deduplication cleanup
+    // 0. Sanitize corrupted entries, wipe ghost running states, and run deduplication cleanup
     try {
+      libraryManager.sanitizeCorruptedEntries();
       await libraryManager.cleanupDuplicateEntries();
       const entries = await libraryManager.getAllEntries();
       for (const entry of entries) {
