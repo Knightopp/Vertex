@@ -8,8 +8,20 @@ export class ProcessManager {
   private knownProcesses = new Map<number, ProcessInfo>();
   private activeLibraryExecutables = new Set<string>();
 
+  private currentIntervalMs: number = 3000;
+  private trayListenerInitialized = false;
+
   async startPolling(intervalMs: number = 3000): Promise<void> {
     if (this.pollingInterval) return;
+    this.currentIntervalMs = intervalMs;
+
+    if (!this.trayListenerInitialized) {
+      this.trayListenerInitialized = true;
+      eventBus.on("tray:mode_changed", ({ inTray }) => {
+        // While in tray, poll every 5s to reduce CPU load; in active mode, poll every 3s
+        this.setPollingInterval(inTray ? 5000 : 3000);
+      });
+    }
 
     // 0. Sanitize corrupted entries, wipe ghost running states, and run deduplication cleanup
     try {
@@ -26,7 +38,16 @@ export class ProcessManager {
     }
 
     this.poll();
-    this.pollingInterval = window.setInterval(() => this.poll(), intervalMs);
+    this.pollingInterval = window.setInterval(() => this.poll(), this.currentIntervalMs);
+  }
+
+  setPollingInterval(intervalMs: number): void {
+    if (this.currentIntervalMs === intervalMs) return;
+    this.currentIntervalMs = intervalMs;
+    if (this.pollingInterval) {
+      window.clearInterval(this.pollingInterval);
+      this.pollingInterval = window.setInterval(() => this.poll(), intervalMs);
+    }
   }
 
   stopPolling(): void {

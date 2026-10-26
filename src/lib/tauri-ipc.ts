@@ -170,3 +170,7 @@ export async function startRecording(): Promise<string | null> {
 export async function stopRecording(): Promise<void> {
   await invokeCommand("stop_recording");
 }
+
+export async function trimMemory(): Promise<void> {
+  await invokeCommand("trim_memory");
+}

@@ -28,6 +28,64 @@ fn get_deep_link(state: State<DeepLinkState>) -> Option<String> {
     state.0.lock().unwrap().take()
 }
 
+#[cfg(desktop)]
+fn show_command_bar_window(cmd_win: &tauri::WebviewWindow) {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::Foundation::{HWND, POINT};
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GetCursorPos, GetSystemMetrics, GetForegroundWindow, GetWindowThreadProcessId,
+            SetWindowPos, SetForegroundWindow, BringWindowToTop,
+            HWND_TOPMOST, SWP_SHOWWINDOW,
+            SM_CXSCREEN, SM_CYSCREEN
+        };
+        use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+
+        let mut pt = POINT { x: 0, y: 0 };
+        unsafe { 
+            let _ = GetCursorPos(&mut pt); 
+            let screen_w = GetSystemMetrics(SM_CXSCREEN);
+            let screen_h = GetSystemMetrics(SM_CYSCREEN);
+            let win_w = 580;
+            let win_h = 350;
+
+            let target_x = (pt.x - (win_w / 2)).max(16).min(screen_w - win_w - 16);
+            let target_y = (pt.y - 30).max(16).min(screen_h - win_h - 16);
+
+            let _ = cmd_win.set_position(tauri::PhysicalPosition::new(target_x, target_y));
+            let _ = cmd_win.show();
+            let _ = cmd_win.set_always_on_top(true);
+            let _ = cmd_win.set_focus();
+
+            if let Ok(hwnd_raw) = cmd_win.hwnd() {
+                let target_hwnd = HWND(hwnd_raw.0 as _);
+                let fg_hwnd = GetForegroundWindow();
+                let mut fg_pid = 0;
+                let fg_thread = GetWindowThreadProcessId(fg_hwnd, Some(&mut fg_pid));
+                let current_thread = GetCurrentThreadId();
+
+                if fg_thread != current_thread && fg_thread != 0 {
+                    let _ = AttachThreadInput(current_thread, fg_thread, true);
+                    let _ = SetWindowPos(target_hwnd, HWND_TOPMOST, target_x, target_y, win_w, win_h, SWP_SHOWWINDOW);
+                    let _ = BringWindowToTop(target_hwnd);
+                    let _ = SetForegroundWindow(target_hwnd);
+                    let _ = AttachThreadInput(current_thread, fg_thread, false);
+                } else {
+                    let _ = SetWindowPos(target_hwnd, HWND_TOPMOST, target_x, target_y, win_w, win_h, SWP_SHOWWINDOW);
+                    let _ = BringWindowToTop(target_hwnd);
+                    let _ = SetForegroundWindow(target_hwnd);
+                }
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = cmd_win.show();
+        let _ = cmd_win.set_always_on_top(true);
+        let _ = cmd_win.set_focus();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -37,6 +95,9 @@ pub fn run() {
             tauri::WindowEvent::CloseRequested { api, .. } => {
                 window.hide().unwrap();
                 api.prevent_close();
+                let _ = window.emit("app:tray-mode", true);
+                #[cfg(target_os = "windows")]
+                commands::system::trim_memory();
             }
             _ => {}
         })
@@ -49,11 +110,18 @@ pub fn run() {
             app.manage(Mutex::new(db));
 
             let args: Vec<String> = std::env::args().collect();
+            let is_autostart = args.iter().any(|a| a == "--hidden");
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.hide();
+                if is_autostart {
+                    let _ = window.hide();
+                    let _ = window.emit("app:tray-mode", true);
+                    #[cfg(target_os = "windows")]
+                    commands::system::trim_memory();
+                } else {
+                    let _ = window.show();
+                    let _ = window.emit("app:tray-mode", false);
+                }
             }
-            // Don't force-show the agent-overlay here — the frontend
-            // will show it only if the user hasn't disabled showWelcomeOverlay.
 
             #[cfg(desktop)]
             {
@@ -72,7 +140,9 @@ pub fn run() {
                         "show" => {
                             if let Some(window) = app.get_webview_window("main") {
                                 window.show().unwrap();
+                                window.unminimize().unwrap();
                                 window.set_focus().unwrap();
+                                let _ = window.emit("app:tray-mode", false);
                             }
                         }
                         _ => {}
@@ -87,9 +157,14 @@ pub fn run() {
                             if let Some(window) = app.get_webview_window("main") {
                                 if window.is_visible().unwrap_or(false) {
                                     window.hide().unwrap();
+                                    let _ = window.emit("app:tray-mode", true);
+                                    #[cfg(target_os = "windows")]
+                                    commands::system::trim_memory();
                                 } else {
                                     window.show().unwrap();
+                                    window.unminimize().unwrap();
                                     window.set_focus().unwrap();
+                                    let _ = window.emit("app:tray-mode", false);
                                 }
                             }
                         }
@@ -124,66 +199,30 @@ pub fn run() {
                                     if is_visible {
                                         let _ = cmd_win.hide();
                                     } else {
-                                        // Get cursor position and clamp window within screen bounds
-                                        #[cfg(target_os = "windows")]
-                                        {
-                                            use windows::Win32::Foundation::{HWND, POINT};
-                                            use windows::Win32::UI::WindowsAndMessaging::{
-                                                GetCursorPos, GetSystemMetrics, GetForegroundWindow, GetWindowThreadProcessId,
-                                                SetWindowPos, SetForegroundWindow, BringWindowToTop,
-                                                HWND_TOPMOST, SWP_SHOWWINDOW,
-                                                SM_CXSCREEN, SM_CYSCREEN
-                                            };
-                                            use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
-
-                                            let mut pt = POINT { x: 0, y: 0 };
-                                            unsafe { 
-                                                let _ = GetCursorPos(&mut pt); 
-                                                let screen_w = GetSystemMetrics(SM_CXSCREEN);
-                                                let screen_h = GetSystemMetrics(SM_CYSCREEN);
-                                                let win_w = 580;
-                                                let win_h = 350;
-
-                                                // Center horizontally near cursor and position above/at cursor
-                                                let target_x = (pt.x - (win_w / 2)).max(16).min(screen_w - win_w - 16);
-                                                let target_y = (pt.y - 30).max(16).min(screen_h - win_h - 16);
-
-                                                let _ = cmd_win.set_position(tauri::PhysicalPosition::new(target_x, target_y));
-                                                let _ = cmd_win.show();
-                                                let _ = cmd_win.set_always_on_top(true);
-                                                let _ = cmd_win.set_focus();
-
-                                                if let Ok(hwnd_raw) = cmd_win.hwnd() {
-                                                    let target_hwnd = HWND(hwnd_raw.0 as _);
-                                                    let fg_hwnd = GetForegroundWindow();
-                                                    let mut fg_pid = 0;
-                                                    let fg_thread = GetWindowThreadProcessId(fg_hwnd, Some(&mut fg_pid));
-                                                    let current_thread = GetCurrentThreadId();
-
-                                                    if fg_thread != current_thread && fg_thread != 0 {
-                                                        let _ = AttachThreadInput(current_thread, fg_thread, true);
-                                                        let _ = SetWindowPos(target_hwnd, HWND_TOPMOST, target_x, target_y, win_w, win_h, SWP_SHOWWINDOW);
-                                                        let _ = BringWindowToTop(target_hwnd);
-                                                        let _ = SetForegroundWindow(target_hwnd);
-                                                        let _ = AttachThreadInput(current_thread, fg_thread, false);
-                                                    } else {
-                                                        let _ = SetWindowPos(target_hwnd, HWND_TOPMOST, target_x, target_y, win_w, win_h, SWP_SHOWWINDOW);
-                                                        let _ = BringWindowToTop(target_hwnd);
-                                                        let _ = SetForegroundWindow(target_hwnd);
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        #[cfg(not(target_os = "windows"))]
-                                        {
-                                            let _ = cmd_win.show();
-                                            let _ = cmd_win.set_always_on_top(true);
-                                            let _ = cmd_win.set_focus();
-                                        }
+                                        show_command_bar_window(&cmd_win);
                                     }
                                 } else {
-                                    // Fallback: toggle command bar inside main window
-                                    let _ = handle.emit("agent-toggle", ());
+                                    // Build on demand only when shortcut is pressed
+                                    if let Ok(cmd_win) = tauri::WebviewWindowBuilder::new(
+                                        &handle,
+                                        "agent-command-bar",
+                                        tauri::WebviewUrl::App("/?w=cmd".into()),
+                                    )
+                                    .title("Vertex Command Bar")
+                                    .inner_size(580.0, 350.0)
+                                    .resizable(false)
+                                    .decorations(false)
+                                    .transparent(true)
+                                    .always_on_top(true)
+                                    .skip_taskbar(true)
+                                    .shadow(false)
+                                    .visible(false)
+                                    .build()
+                                    {
+                                        show_command_bar_window(&cmd_win);
+                                    } else {
+                                        let _ = handle.emit("agent-toggle", ());
+                                    }
                                 }
                             }
                         },
@@ -225,6 +264,7 @@ pub fn run() {
             commands::system::take_screenshot,
             commands::system::start_recording,
             commands::system::stop_recording,
+            commands::system::trim_memory,
         ]);
 
     #[cfg(desktop)]
@@ -244,19 +284,13 @@ pub fn run() {
                 *state.0.lock().unwrap() = Some(url.clone());
             }
 
-            if has_deep_link {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.unminimize();
-                    let _ = window.set_focus();
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+                let _ = window.emit("app:tray-mode", false);
+                if has_deep_link {
                     let _ = window.emit("deep-link-received", args.clone());
-                }
-            } else {
-                // Don't force-show the agent-overlay — the frontend handles
-                // overlay visibility based on the showWelcomeOverlay setting.
-                // Just emit an event so the frontend can decide.
-                if let Some(agent_window) = app.get_webview_window("agent-overlay") {
-                    let _ = agent_window.emit("check-overlay", ());
                 }
             }
         }))

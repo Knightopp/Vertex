@@ -77,27 +77,65 @@ export const useTrackingStore = create<TrackingState>()((set) => {
     });
   });
 
-  // We need a timer in the UI store to increment the active session time 
-  // so the UI components re-render every second.
-  // We can just set up a setInterval here.
-  if (typeof window !== "undefined") {
-    window.setInterval(() => {
+  // We only tick the UI store when there are active sessions AND the app is not in tray mode
+  let uiTimer: number | null = null;
+
+  const startUiTicker = () => {
+    if (uiTimer || typeof window === "undefined") return;
+    uiTimer = window.setInterval(() => {
       set((state) => {
+        const sessionKeys = Object.keys(state.activeSessions);
+        if (sessionKeys.length === 0) return state;
+
         let changed = false;
         const nextSessions = { ...state.activeSessions };
         
         for (const [entryId, session] of Object.entries(nextSessions)) {
-          nextSessions[entryId] = {
-            ...session,
-            effectiveSeconds: session.effectiveSeconds + 1
-          };
-          changed = true;
+          if (!session.isIdle) {
+            nextSessions[entryId] = {
+              ...session,
+              effectiveSeconds: session.effectiveSeconds + 1
+            };
+            changed = true;
+          }
         }
         
         return changed ? { activeSessions: nextSessions } : state;
       });
     }, 1000);
-  }
+  };
+
+  const stopUiTicker = () => {
+    if (uiTimer) {
+      window.clearInterval(uiTimer);
+      uiTimer = null;
+    }
+  };
+
+  // Start by default
+  startUiTicker();
+
+  // Listen to tray mode to freeze all UI re-render updates when minimized to tray
+  eventBus.on("tray:mode_changed", ({ inTray }) => {
+    if (inTray) {
+      stopUiTicker();
+    } else {
+      // Re-sync timestamps from start when restoring to prevent UI skips
+      set((state) => {
+        const next = { ...state.activeSessions };
+        for (const [entryId, session] of Object.entries(next)) {
+          const startedTime = new Date(session.startedAt).getTime();
+          const totalElapsed = Math.max(0, Math.floor((Date.now() - startedTime) / 1000));
+          next[entryId] = {
+            ...session,
+            effectiveSeconds: totalElapsed
+          };
+        }
+        return { activeSessions: next };
+      });
+      startUiTicker();
+    }
+  });
 
   return {
     activeSessions: {},

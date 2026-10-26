@@ -25,6 +25,10 @@ import { sessionManager } from "@/services/SessionManager";
 import { syncManager } from "@/services/SyncManager";
 import { libraryManager } from "@/services/LibraryManager";
 import { agentCore, registerAgentActions } from "@/services/agent/AgentCore";
+import { trayManager } from "@/services/TrayManager";
+
+// Initialize low-resource tray manager
+trayManager.init();
 
 // Synchronously register all agent actions before React boots
 registerAgentActions();

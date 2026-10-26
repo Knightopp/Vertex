@@ -536,3 +536,15 @@ pub fn stop_recording() -> Result<(), String> {
         Err("No active recording".into())
     }
 }
+
+#[tauri::command]
+pub fn trim_memory() {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::System::ProcessStatus::EmptyWorkingSet;
+        use windows::Win32::System::Threading::GetCurrentProcess;
+        unsafe {
+            let _ = EmptyWorkingSet(GetCurrentProcess());
+        }
+    }
+}

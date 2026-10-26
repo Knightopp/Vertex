@@ -48,7 +48,9 @@ export class SessionManager {
     
     this.activeSessions.set(entryId, session);
     await libraryManager.addSession(entryId, session);
-    session.timerId = window.setInterval(() => void this.tick(session), 1000);
+    // Tick every 5 seconds instead of every 1s to save 80% IPC calls and CPU wakeups.
+    // Accurate down to the second because elapsed time is computed from timestamp delta.
+    session.timerId = window.setInterval(() => void this.tick(session), 5000);
     eventBus.emit("session:started", { sessionId: session.id, entryId, startedAt: now });
   }
 

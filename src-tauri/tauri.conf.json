@@ -23,39 +23,7 @@
         "center": true,
         "decorations": true,
         "transparent": false,
-        "visible": false
-      },
-      {
-        "label": "agent-overlay",
-        "title": "Vertex Agent",
-        "url": "/?w=overlay",
-        "width": 520,
-        "height": 560,
-        "resizable": false,
-        "fullscreen": false,
-        "center": true,
-        "decorations": false,
-        "transparent": true,
-        "visible": false,
-        "skipTaskbar": true,
-        "alwaysOnTop": true,
-        "shadow": false
-      },
-      {
-        "label": "agent-command-bar",
-        "title": "Vertex Command Bar",
-        "url": "/?w=cmd",
-        "width": 580,
-        "height": 350,
-        "resizable": false,
-        "fullscreen": false,
-        "center": true,
-        "decorations": false,
-        "transparent": true,
-        "visible": false,
-        "skipTaskbar": true,
-        "alwaysOnTop": true,
-        "shadow": false
+        "visible": true
       }
     ],
     "security": {

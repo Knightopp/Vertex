@@ -422,7 +422,7 @@ export default function Settings() {
                                 await win.setFocus();
                                 await win.setAlwaysOnTop(true);
                               } else {
-                                toast.error("Command bar window not found!");
+                                useAgentStore.getState().setCommandInterfaceOpen(true);
                               }
                             } catch(e: any) {
                               toast.error(e.toString());

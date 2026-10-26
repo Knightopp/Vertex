@@ -43,6 +43,23 @@ export class SessionSnapshotManager {
       // Capture whenever a process or session state updates
       eventBus.on("game:detected", () => this.captureCurrentSession());
       eventBus.on("app:detected", () => this.captureCurrentSession());
+
+      // Pause snapshot timer while sleeping in tray
+      eventBus.on("tray:mode_changed", ({ inTray }) => {
+        if (inTray) {
+          if (this.updateTimer) {
+            window.clearInterval(this.updateTimer);
+            this.updateTimer = null;
+          }
+        } else {
+          this.captureCurrentSession();
+          if (!this.updateTimer) {
+            this.updateTimer = window.setInterval(() => {
+              this.captureCurrentSession();
+            }, 30000);
+          }
+        }
+      });
     }
   }
 

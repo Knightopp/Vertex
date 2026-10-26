@@ -32,6 +32,9 @@ export type EventMap = {
   "job:started": { jobId: string; type: string };
   "job:completed": { jobId: string; type: string };
   "job:failed": { jobId: string; type: string; error: string };
+
+  // Tray / Low resource mode
+  "tray:mode_changed": { inTray: boolean };
 };
 
 export type EventHandler<T> = (payload: T) => void;

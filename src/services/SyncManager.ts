@@ -73,6 +73,21 @@ export class SyncManager {
     // Start background sync every 30 seconds
     this.syncInterval = setInterval(() => this.triggerSync(), 30000);
 
+    // Pause periodic sync while in system tray to save network/CPU
+    eventBus.on("tray:mode_changed", ({ inTray }) => {
+      if (inTray) {
+        if (this.syncInterval) {
+          clearInterval(this.syncInterval);
+          this.syncInterval = null;
+        }
+      } else {
+        if (!this.syncInterval) {
+          this.syncInterval = setInterval(() => this.triggerSync(), 30000);
+          this.triggerSync();
+        }
+      }
+    });
+
     // Sanitize any corrupted titles already stuck in the sync queue
     const queue = getSyncQueue();
     let queueDirty = false;
